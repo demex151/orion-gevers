@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import App from "./App.jsx";
 import { createSessionClient } from "./sessionClient.js";
 import { uiStateForSession } from "./sessionFlow.js";
+import { playAudioBlob } from "./audioPlayback.js";
 import "./HomeShellFix.css";
 
 const API="http://127.0.0.1:8000";
@@ -43,9 +44,7 @@ export default function HomeShell(){
         if(cancelled||!mounted.current)return;
         setSessionState(data.state||"SENTINEL");
         if(!busy)setStatus(uiStateForSession(data.state).label);
-      }catch(error){
-        if(!cancelled&&mounted.current&&!busy)setStatus("Backend desconectado");
-      }
+      }catch(error){if(!cancelled&&mounted.current&&!busy)setStatus("Backend desconectado")}
     }
     sync();
     const timer=setInterval(sync,700);
@@ -59,24 +58,13 @@ export default function HomeShell(){
     async function conversationLoop(){
       while(!cancelled&&mounted.current){
         let heard;
-        try{
-          setStatus("Escuchando");
-          heard=await sessionClient.listen();
-        }catch(error){
-          if(!cancelled&&mounted.current)setStatus("Error de micrófono");
-          break;
-        }
+        try{setStatus("Escuchando");heard=await sessionClient.listen()}
+        catch(error){if(!cancelled&&mounted.current)setStatus("Error de micrófono");break}
         if(cancelled||!mounted.current)break;
-        if(heard?.closed){
-          setSessionState("SENTINEL");
-          setStatus("Esperando ORION o doble aplauso");
-          setSubtitle("");
-          break;
-        }
+        if(heard?.closed){setSessionState("SENTINEL");setStatus("Esperando ORION o doble aplauso");setSubtitle("");break}
         const text=String(heard?.text||"").trim();
         if(!heard?.ok||!text)continue;
-        setSubtitle(text);
-        setStatus("Pensando");
+        setSubtitle(text);setStatus("Pensando");
         try{
           const response=await fetch(`${API}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
           const data=await response.json();
@@ -85,10 +73,7 @@ export default function HomeShell(){
           if(!answer)throw new Error("GEVER respondió vacío");
           setSubtitle(answer);
           await speak(answer);
-        }catch(error){
-          console.error("[GEVER SESSION]",error);
-          setStatus("Error de conexión");
-        }
+        }catch(error){console.error("[GEVER SESSION]",error);setStatus("Error de conexión")}
       }
       loopRunning.current=false;
     }
@@ -103,9 +88,12 @@ export default function HomeShell(){
     const response=await fetch(`${API}/api/tts`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
     if(!response.ok)throw new Error(`TTS respondió ${response.status}`);
     const blob=await response.blob();
-    const url=URL.createObjectURL(blob);
-    const audio=new Audio(url);
-    await new Promise((resolve,reject)=>{audio.onplaying=()=>setStatus("Hablando");audio.onended=()=>{URL.revokeObjectURL(url);resolve()};audio.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("No se pudo reproducir la voz"))};audio.play().catch(reject)});
+    const result=await playAudioBlob(blob,{onPlaying:()=>mounted.current&&setStatus("Hablando")});
+    if(result?.blocked){
+      console.warn("[GEVER AUDIO] El navegador bloqueó autoplay",result.error);
+      setStatus("Audio bloqueado: haz clic una vez en la pantalla");
+      throw result.error||new Error("Autoplay bloqueado");
+    }
     if(mounted.current)setStatus("Escuchando");
   }
 
@@ -120,9 +108,8 @@ export default function HomeShell(){
       if(data?.ok===false)throw new Error(data.error||"GEVER no pudo responder");
       const answer=String(data?.answer||"").trim();
       if(!answer)throw new Error("GEVER respondió vacío");
-      setSubtitle(answer);
-      await speak(answer);
-    }catch(error){console.error("[GEVER HOME]",error);setStatus("Error de conexión")}
+      setSubtitle(answer);await speak(answer);
+    }catch(error){console.error("[GEVER HOME]",error);if(error?.name!=="NotAllowedError")setStatus("Error de conexión")}
     finally{setBusy(false)}
   }
 
@@ -132,9 +119,7 @@ export default function HomeShell(){
     try{
       const data=await sessionClient.close();
       if(data?.ok===false)throw new Error(data.error||"No se pudo cerrar la sesión");
-      setSessionState("SENTINEL");
-      setSubtitle("");
-      setStatus("Esperando ORION o doble aplauso");
+      setSessionState("SENTINEL");setSubtitle("");setStatus("Esperando ORION o doble aplauso");
     }catch(error){console.error("[GEVER CLOSE]",error);setStatus("No se pudo cerrar")}
   }
 
@@ -142,8 +127,7 @@ export default function HomeShell(){
     <div className={homeVisible?"legacy-app legacy-hidden":"legacy-app legacy-visible"}><App/></div>
     {homeVisible&&<div className="figma-home" data-node-id="2004:3">
       <img className="figma-background" src={FIGMA_BG} onError={e=>{if(e.currentTarget.src!==FIGMA_BG_ALT)e.currentTarget.src=FIGMA_BG_ALT}} alt=""/>
-      <div className="figma-focus-ring"/>
-      <div className="figma-logo"><div className="figma-logo-icon">G</div><div><b>GEVER</b><small>INTELLIGENCE SYSTEM</small></div></div>
+      <div className="figma-focus-ring"/><div className="figma-logo"><div className="figma-logo-icon">G</div><div><b>GEVER</b><small>INTELLIGENCE SYSTEM</small></div></div>
       <nav className="figma-nav">{navItems.map(([icon,label,section],i)=><button key={label} className={i===0?"active":""} onClick={()=>openSection(section)}><span>{icon}</span><b>{label}</b></button>)}</nav>
       <div className="figma-core-card"><div className="figma-core-orb">◉</div><div><b>Núcleo AI</b><small>● Activo</small></div></div>
       <header className="figma-header"><div className="figma-status"><span>● Sistema operativo</span><span>● Todo bajo control</span></div><div className="figma-toolbar"><span>⌕</span><span>▦</span><span>♧</span><b>+</b></div></header>
