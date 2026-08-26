@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import App from "./App.jsx";
-import localHero from "./assets/hero.png";
 import "./HomeShellFix.css";
 
-const FIGMA_BG="https://www.figma.com/api/mcp/asset/16911c84-b5b0-4d39-9f40-c04cafd4f426.png";
+const FIGMA_BG="https://www.figma.com/api/mcp/asset/35c2b6c1-77e1-4593-98b7-ac82a2b0d542";
+const FIGMA_BG_ALT="https://www.figma.com/api/mcp/asset/16911c84-b5b0-4d39-9f40-c04cafd4f426.png";
 const ORB_OUTER_1="https://www.figma.com/api/mcp/asset/9dac0c5f-cac6-4862-8608-dda298b68f8e.svg";
 const ORB_OUTER_2="https://www.figma.com/api/mcp/asset/81f89820-7336-4bb4-86c9-67175c45cf42.png";
 const ORB_MEDIUM="https://www.figma.com/api/mcp/asset/d2898649-77eb-40c3-bbc8-10b68d42a12f.svg";
@@ -33,7 +33,7 @@ export default function HomeShell(){
   return <div className="gever-shell-root">
     <div className={homeVisible?"legacy-app legacy-hidden":"legacy-app legacy-visible"}><App/></div>
     {homeVisible&&<div className="figma-home" data-node-id="2004:3">
-      <img className="figma-background" src={FIGMA_BG} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=localHero}} alt=""/>
+      <img className="figma-background" src={FIGMA_BG} onError={e=>{if(e.currentTarget.src!==FIGMA_BG_ALT)e.currentTarget.src=FIGMA_BG_ALT}} alt=""/>
 
       <div className="figma-focus-ring"/>
       <div className="figma-logo"><div className="figma-logo-icon">G</div><div><b>GEVER</b><small>INTELLIGENCE SYSTEM</small></div></div>
