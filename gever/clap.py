@@ -5,11 +5,11 @@ class ClapDetector:
         self,
         *,
         spike_ratio=7.0,
-        min_rms=0.012,
-        min_double_gap=0.05,
-        max_double_gap=0.35,
-        cooldown=0.45,
-        retrigger_ratio=0.55,
+        min_rms=0.06,
+        min_double_gap=0.08,
+        max_double_gap=0.32,
+        cooldown=0.75,
+        retrigger_ratio=0.45,
         noise_floor_alpha=0.992,
         quiet_gate_mult=2.2,
     ):
@@ -24,6 +24,11 @@ class ClapDetector:
         self.noise_floor = 1e-4
         self.first_clap_time = None
         self.last_double_time = -1e9
+        self.armed = True
+
+    def reset(self):
+        """Forget an incomplete clap sequence when audio ownership changes."""
+        self.first_clap_time = None
         self.armed = True
 
     def update(self, level: float, now: float) -> bool:
