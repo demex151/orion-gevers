@@ -14,13 +14,19 @@ class FakeClap:
 
 
 class FakeWake:
-    def __init__(self, available=True, result=False):
+    def __init__(self, available=True, result=False, flush_result=False):
         self.available = available
         self.result = result
+        self.flush_result = flush_result
         self.error = None
+        self.flush_calls = 0
 
     def feed_pcm16(self, pcm):
         return self.result
+
+    def flush(self):
+        self.flush_calls += 1
+        return self.flush_result
 
 
 class SentinelTests(unittest.TestCase):
@@ -45,6 +51,20 @@ class SentinelTests(unittest.TestCase):
         monitor._on_activate = activations.append
         monitor._running = True
         monitor.process_frame(np.zeros((160, 1), dtype=np.float32), now=1.0)
+        self.assertEqual(activations, ["orion"])
+
+    def test_phrase_engine_flushes_after_voice_returns_to_silence(self):
+        wake = FakeWake(result=False, flush_result=True)
+        monitor = SentinelMonitor(FakeClap(False), wake, stream_factory=lambda **_: None, voice_threshold=0.01, silence_seconds=0.25)
+        activations = []
+        monitor._on_activate = activations.append
+        monitor._running = True
+        voice = np.full((1600, 1), 0.08, dtype=np.float32)
+        silence = np.zeros((1600, 1), dtype=np.float32)
+        monitor.process_frame(voice, now=1.0)
+        monitor.process_frame(silence, now=1.10)
+        monitor.process_frame(silence, now=1.40)
+        self.assertEqual(wake.flush_calls, 1)
         self.assertEqual(activations, ["orion"])
 
     def test_degraded_wake_still_allows_clap(self):
