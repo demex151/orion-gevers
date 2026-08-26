@@ -1,11 +1,8 @@
 import os
-import re
 import tempfile
 import threading
-import unicodedata
 
 import edge_tts
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -13,33 +10,18 @@ from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
 from gever.brain import GeversBrain
+from gever.clap import ClapDetector
+from gever.commands import is_close_session_command
+from gever.conversation_audio import ConversationAudioState
 from gever.listen import GeversListener
+from gever.sentinel import SentinelMonitor
+from gever.session import SessionController, SessionState
 from gever.speech_director import GeversSpeechDirector
-from gever.voice import (
-    GeversVoice,
-    VOICE,
-    VOICE_RATE,
-    VOICE_PITCH,
-    VOICE_VOLUME,
-)
+from gever.voice import GeversVoice, VOICE, VOICE_RATE, VOICE_PITCH, VOICE_VOLUME
+from gever.wakeword import WakeWordDetector
 
 
-# =========================================================
-# CONFIGURACIÓN
-# =========================================================
-
-WAKE_WORD = "orion"
-
-
-app = FastAPI(
-    title="GEVER Backend",
-    version="1.9.0"
-)
-
-
-# =========================================================
-# CORS
-# =========================================================
+app = FastAPI(title="GEVER Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -54,30 +36,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# =========================================================
-# SISTEMAS
-# =========================================================
-
 brain = GeversBrain()
-
 listener = GeversListener()
-
 voice_cleaner = GeversVoice()
-
 speech_director = GeversSpeechDirector()
+conversation_audio = ConversationAudioState()
 
-
-# =========================================================
-# CONTROL DEL MICRÓFONO
-# =========================================================
+clap_detector = ClapDetector()
+wake_detector = WakeWordDetector(keyword="orion")
+sentinel = SentinelMonitor(clap_detector, wake_detector)
+session_controller = SessionController(sentinel, conversation_audio)
 
 microphone_lock = threading.Lock()
 
-
-# =========================================================
-# MODELOS
-# =========================================================
 
 class ChatRequest(BaseModel):
     message: str
@@ -87,28 +58,40 @@ class SpeakRequest(BaseModel):
     text: str
 
 
-# =========================================================
-# ROOT
-# =========================================================
+class OpenSessionRequest(BaseModel):
+    trigger: str = "manual"
+
+
+@app.on_event("startup")
+def startup_audio():
+    try:
+        session_controller.start()
+    except Exception as exc:
+        print(f"[SENTINEL] No pudo iniciar: {exc}")
+
+
+@app.on_event("shutdown")
+def shutdown_audio():
+    try:
+        session_controller.stop()
+    except Exception:
+        pass
+
 
 @app.get("/")
 def root():
-
     return {
         "name": "GEVER",
         "status": "online",
-        "version": "1.9.0",
+        "version": "2.0.0",
         "wake_word": "ORION",
+        "activation": ["ORION", "DOUBLE_CLAP"],
     }
 
 
-# =========================================================
-# STATUS
-# =========================================================
-
 @app.get("/api/status")
 def status():
-
+    snapshot = session_controller.snapshot()
     return {
         "status": "online",
         "brain": "ready",
@@ -116,391 +99,159 @@ def status():
         "microphone": "ready",
         "voice": "ready",
         "wake_word": "ORION",
+        "wake_local_available": wake_detector.available,
+        "wake_local_error": wake_detector.error,
+        "session": snapshot,
         "voice_model": VOICE,
         "voice_rate": VOICE_RATE,
         "voice_pitch": VOICE_PITCH,
     }
 
 
-# =========================================================
-# MEMORIA
-# =========================================================
+@app.get("/api/session/status")
+def session_status():
+    result = session_controller.snapshot()
+    result["wake_local_available"] = wake_detector.available
+    result["wake_local_error"] = wake_detector.error
+    result["double_clap_available"] = True
+    return result
+
+
+@app.post("/api/session/open")
+def session_open(request: OpenSessionRequest):
+    if conversation_audio.is_active:
+        return {"ok": False, "error": "El micrófono conversacional todavía está ocupado."}
+    conversation_audio.reset()
+    result = session_controller.open_session(request.trigger)
+    return {"ok": True, **result}
+
+
+@app.post("/api/session/close")
+def session_close():
+    try:
+        result = session_controller.close_session("ui")
+        return {"ok": True, **result}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), **session_controller.snapshot()}
+
 
 @app.get("/api/memories")
 def memories():
-
     try:
+        return {"ok": True, "memories": brain.memories()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
-        return {
-            "ok": True,
-            "memories": brain.memories(),
-        }
-
-    except Exception as e:
-
-        return {
-            "ok": False,
-            "error": str(e),
-        }
-
-
-# =========================================================
-# CHAT
-# =========================================================
 
 @app.post("/api/chat")
-def chat(
-    request: ChatRequest
-):
-
+def chat(request: ChatRequest):
     message = request.message.strip()
-
     if not message:
+        return {"ok": False, "error": "Mensaje vacío"}
+    try:
+        answer = brain.think(message)
+        return {"ok": True, "answer": answer}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
-        return {
-            "ok": False,
-            "error": "Mensaje vacío",
-        }
+
+def _capture_session_utterance():
+    if session_controller.state != SessionState.SESSION:
+        return {"ok": False, "inactive": True, "error": "GEVER no está en una sesión activa."}
+
+    if not conversation_audio.begin():
+        return {"ok": False, "closed": True, "error": "La sesión está cerrándose."}
 
     try:
+        with microphone_lock:
+            text = listener.listen()
+    finally:
+        conversation_audio.finish()
 
-        answer = brain.think(
-            message
-        )
-
-        return {
-            "ok": True,
-            "answer": answer,
-        }
-
-    except Exception as e:
-
-        return {
-            "ok": False,
-            "error": str(e),
-        }
-
-
-# =========================================================
-# QUITAR ACENTOS
-# =========================================================
-
-def remove_accents(text):
-    """
-    Convierte:
-        orión -> orion
-        conversación -> conversacion
-    """
-
-    normalized = unicodedata.normalize(
-        "NFD",
-        str(text)
-    )
-
-    return "".join(
-        char
-        for char in normalized
-        if unicodedata.category(char) != "Mn"
-    )
-
-
-# =========================================================
-# NORMALIZAR TEXTO WAKE
-# =========================================================
-
-def normalize_wake_text(text):
+    if conversation_audio.cancel_requested:
+        return {"ok": False, "closed": True, "discarded": True}
 
     if not text:
-        return ""
+        return {"ok": False, "error": "No se detectó ninguna frase."}
 
-    normalized = str(text).lower()
+    if text.startswith("ERROR_RECONOCIMIENTO:"):
+        return {"ok": False, "error": text}
 
-    normalized = remove_accents(
-        normalized
-    )
+    print(f"[CONVERSACION] Escuchado: {text}")
 
-    normalized = (
-        normalized
-        .replace("¿", "")
-        .replace("?", "")
-        .replace("¡", "")
-        .replace("!", "")
-        .replace(",", " ")
-        .replace(".", " ")
-        .replace(":", " ")
-        .replace(";", " ")
-    )
+    if is_close_session_command(text):
+        try:
+            result = session_controller.close_session("voice")
+            return {"ok": True, "closed": True, "text": text, **result}
+        except Exception as exc:
+            return {"ok": False, "closed": True, "error": str(exc)}
 
-    normalized = re.sub(
-        r"\s+",
-        " ",
-        normalized
-    )
-
-    return normalized.strip()
+    return {"ok": True, "closed": False, "text": text}
 
 
-# =========================================================
-# DETECTAR ORION
-# =========================================================
-
-def detect_wake_word(text):
-
-    normalized = normalize_wake_text(
-        text
-    )
-
-    print(
-        f"[WAKE NORMALIZADO]: {normalized}"
-    )
-
-    if not normalized:
-
-        return False, ""
-
-    words = normalized.split()
-
-    if WAKE_WORD not in words:
-
-        return False, ""
-
-    position = words.index(
-        WAKE_WORD
-    )
-
-    command_words = words[
-        position + 1:
-    ]
-
-    command = " ".join(
-        command_words
-    ).strip()
-
-    return True, command
+@app.post("/api/session/listen")
+def session_listen():
+    return _capture_session_utterance()
 
 
-# =========================================================
-# ESCUCHA NORMAL
-# =========================================================
-
+# Legacy endpoint retained temporarily so the stable UI has a rollback path.
+# New frontend code must use /api/session/listen.
 @app.post("/api/listen")
-def listen():
-
-    try:
-
-        with microphone_lock:
-
-            text = listener.listen(
-                timeout=None,
-                phrase_time_limit=None
-            )
-
-        if not text:
-
-            return {
-                "ok": False,
-                "error":
-                    "No se detectó ninguna frase.",
-            }
-
-        if text.startswith(
-            "ERROR_RECONOCIMIENTO:"
-        ):
-
-            return {
-                "ok": False,
-                "error": text,
-            }
-
-        print(
-            f"[CONVERSACION] Escuchado: {text}"
-        )
-
-        return {
-            "ok": True,
-            "text": text,
-        }
-
-    except Exception as e:
-
-        return {
-            "ok": False,
-            "error": str(e),
-        }
+def listen_legacy():
+    return _capture_session_utterance()
 
 
-# =========================================================
-# ESCUCHA DE ORION
-# =========================================================
-
+# Legacy wake endpoint no longer opens the conversational microphone.
 @app.post("/api/wake-listen")
-def wake_listen():
+def wake_listen_legacy():
+    snapshot = session_controller.snapshot()
+    return {
+        "ok": True,
+        "activated": snapshot["state"] == SessionState.SESSION.value,
+        "heard": "",
+        "command": "",
+        "wake_word": "ORION",
+        "legacy": True,
+        **snapshot,
+    }
 
-    try:
-
-        with microphone_lock:
-
-            text = listener.listen_wake()
-
-        if not text:
-
-            return {
-                "ok": True,
-                "activated": False,
-                "heard": "",
-                "command": "",
-                "wake_word": "ORION",
-            }
-
-        if text.startswith(
-            "ERROR_RECONOCIMIENTO:"
-        ):
-
-            return {
-                "ok": False,
-                "activated": False,
-                "heard": text,
-                "command": "",
-                "wake_word": "ORION",
-                "error": text,
-            }
-
-        activated, command = (
-            detect_wake_word(
-                text
-            )
-        )
-
-        print(
-            f"[WAKE] Escuchado: {text}"
-        )
-
-        if activated:
-
-            print(
-                "[WAKE] ORION DETECTADO"
-            )
-
-            print(
-                "[WAKE] GEVER ACTIVADO"
-            )
-
-            if command:
-
-                print(
-                    f"[WAKE] Instrucción: {command}"
-                )
-
-        return {
-            "ok": True,
-            "activated": activated,
-            "heard": text,
-            "command": command,
-            "wake_word": "ORION",
-        }
-
-    except Exception as e:
-
-        return {
-            "ok": False,
-            "activated": False,
-            "heard": "",
-            "command": "",
-            "wake_word": "ORION",
-            "error": str(e),
-        }
-
-
-# =========================================================
-# ARCHIVOS TEMPORALES
-# =========================================================
 
 def remove_temp_file(path):
-
     try:
-
-        os.remove(
-            path
-        )
-
+        os.remove(path)
     except OSError:
-
         pass
 
 
-# =========================================================
-# TEXT TO SPEECH
-# =========================================================
-
 @app.post("/api/tts")
-async def text_to_speech(
-    request: SpeakRequest
-):
-
-    directed_text = speech_director.direct(
-        request.text
-    )
-
-    text = (
-        voice_cleaner
-        .clean_for_speech(
-            directed_text
-        )
-    )
+async def text_to_speech(request: SpeakRequest):
+    directed_text = speech_director.direct(request.text)
+    text = voice_cleaner.clean_for_speech(directed_text)
 
     if not text:
+        return {"ok": False, "error": "Texto vacío después de limpiar."}
 
-        return {
-            "ok": False,
-            "error":
-                "Texto vacío después de limpiar.",
-        }
+    print(f"[TTS DIRIGIDO]: {text}")
 
-    print(
-        f"[TTS DIRIGIDO]: {text}"
-    )
-
-    temp_file = (
-        tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=".mp3"
-        )
-    )
-
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     temp_path = temp_file.name
-
     temp_file.close()
 
     try:
-
-        communicator = (
-            edge_tts.Communicate(
-                text=text,
-                voice=VOICE,
-                rate=VOICE_RATE,
-                pitch=VOICE_PITCH,
-                volume=VOICE_VOLUME,
-            )
+        communicator = edge_tts.Communicate(
+            text=text,
+            voice=VOICE,
+            rate=VOICE_RATE,
+            pitch=VOICE_PITCH,
+            volume=VOICE_VOLUME,
         )
-
-        await communicator.save(
-            temp_path
-        )
-
+        await communicator.save(temp_path)
         return FileResponse(
             path=temp_path,
             media_type="audio/mpeg",
             filename="gever-response.mp3",
-            background=BackgroundTask(
-                remove_temp_file,
-                temp_path
-            ),
+            background=BackgroundTask(remove_temp_file, temp_path),
         )
-
     except Exception:
-
-        remove_temp_file(
-            temp_path
-        )
-
+        remove_temp_file(temp_path)
         raise
