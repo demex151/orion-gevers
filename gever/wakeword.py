@@ -1,11 +1,5 @@
 class WakeWordDetector:
-    """Pluggable local ORION detector with explicit degraded mode.
-
-    The core intentionally has no dependency on PocketSphinx or any other
-    native wake-word package. An engine can be injected independently, while
-    double-clap activation remains available if voice wake is unavailable.
-    Idle audio handled here is never sent to GEVER's brain/chat pipeline.
-    """
+    """Pluggable ORION detector with explicit degraded mode."""
 
     def __init__(self, engine_factory=None, keyword="orion"):
         self.keyword = keyword.lower().strip()
@@ -14,7 +8,7 @@ class WakeWordDetector:
         self.error = None
 
         if engine_factory is None:
-            self.error = "No compatible local ORION engine configured"
+            self.error = "No compatible ORION engine configured"
             return
 
         try:
@@ -32,7 +26,6 @@ class WakeWordDetector:
     def feed_pcm16(self, pcm: bytes) -> bool:
         if not self.available or not self.engine or not pcm:
             return False
-
         try:
             result = self.engine.feed_pcm16(pcm)
             if isinstance(result, bool):
@@ -41,5 +34,16 @@ class WakeWordDetector:
             return self.keyword in heard.split()
         except Exception as exc:
             self.error = str(exc)
-            self.available = False
+            return False
+
+    def flush(self) -> bool:
+        if not self.available or not self.engine:
+            return False
+        flush = getattr(self.engine, "flush", None)
+        if not callable(flush):
+            return False
+        try:
+            return bool(flush())
+        except Exception as exc:
+            self.error = str(exc)
             return False
