@@ -46,11 +46,16 @@ class SentinelTests(unittest.TestCase):
         self.assertEqual(activations, ["clap"])
 
     def test_orion_activates_without_clap(self):
-        monitor = SentinelMonitor(FakeClap(False), FakeWake(result=True), stream_factory=lambda **_: None)
+        wake = FakeWake(result=False, flush_result=True)
+        monitor = SentinelMonitor(FakeClap(False), wake, stream_factory=lambda **_: None, voice_threshold=0.01, silence_seconds=0.25)
         activations = []
         monitor._on_activate = activations.append
         monitor._running = True
-        monitor.process_frame(np.zeros((160, 1), dtype=np.float32), now=1.0)
+        voice = np.full((1600, 1), 0.08, dtype=np.float32)
+        silence = np.zeros((1600, 1), dtype=np.float32)
+        monitor.process_frame(voice, now=1.0)
+        monitor.process_frame(silence, now=1.10)
+        monitor.process_frame(silence, now=1.40)
         self.assertEqual(activations, ["orion"])
 
     def test_phrase_engine_flushes_after_voice_returns_to_silence(self):
