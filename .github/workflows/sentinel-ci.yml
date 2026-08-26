@@ -49,6 +49,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
       - name: Run session unit tests
-        run: node --test src/sessionFlow.test.js src/sessionClient.test.js src/legacyVisualState.test.js
+        run: node --test src/sessionFlow.test.js src/sessionClient.test.js src/legacyVisualState.test.js src/audioPlayback.test.js
       - name: Build frontend
         run: npm run build
