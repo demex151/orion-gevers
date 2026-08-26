@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/gever-sentinel-audio
+      - fix/orion-speechrecognition-sentinel
   pull_request:
     branches:
       - fix/single-controller-visual-state
@@ -25,6 +26,7 @@ jobs:
           python -m pytest \
             tests/test_clap.py \
             tests/test_wakeword.py \
+            tests/test_orion_phrase_engine.py \
             tests/test_sentinel.py \
             tests/test_session.py \
             tests/test_close_commands.py \
