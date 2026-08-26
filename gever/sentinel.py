@@ -18,11 +18,7 @@ def float32_to_pcm16(frame) -> bytes:
 
 
 class SentinelMonitor:
-    """Own the microphone only while GEVER is idle.
-
-    Frames are inspected locally for clap energy and the ORION keyword.
-    This component has no dependency on GEVER's brain, chat, memory or TTS.
-    """
+    """Own the microphone only while GEVER is idle."""
 
     def __init__(
         self,
@@ -33,18 +29,24 @@ class SentinelMonitor:
         blocksize=1600,
         device=None,
         stream_factory=None,
+        voice_threshold=0.015,
+        silence_seconds=0.45,
     ):
         self.clap_detector = clap_detector
         self.wake_detector = wake_detector
         self.samplerate = samplerate
         self.blocksize = blocksize
         self.device = device
+        self.voice_threshold = float(voice_threshold)
+        self.silence_seconds = float(silence_seconds)
         self._stream_factory = stream_factory
         self._stream = None
         self._running = False
         self._activation_sent = False
         self._on_activate = None
         self._lock = threading.RLock()
+        self._voice_started = False
+        self._last_voice_at = None
         self.error = None
 
     def _default_stream_factory(self, **kwargs):
@@ -57,6 +59,8 @@ class SentinelMonitor:
                 return
             self._on_activate = on_activate
             self._activation_sent = False
+            self._voice_started = False
+            self._last_voice_at = None
             self.error = None
             factory = self._stream_factory or self._default_stream_factory
             try:
@@ -99,8 +103,25 @@ class SentinelMonitor:
             level = rms_mono(frame)
             if self.clap_detector.update(level, now):
                 return self._emit_activation("clap")
-            if self.wake_detector.available and self.wake_detector.feed_pcm16(float32_to_pcm16(frame)):
-                return self._emit_activation("orion")
+
+            if not self.wake_detector.available:
+                return None
+
+            if level >= self.voice_threshold:
+                self._voice_started = True
+                self._last_voice_at = now
+                if self.wake_detector.feed_pcm16(float32_to_pcm16(frame)):
+                    return self._emit_activation("orion")
+                return None
+
+            if self._voice_started:
+                self.wake_detector.feed_pcm16(float32_to_pcm16(frame))
+                if self._last_voice_at is not None and now - self._last_voice_at >= self.silence_seconds:
+                    self._voice_started = False
+                    self._last_voice_at = None
+                    flush = getattr(self.wake_detector, "flush", None)
+                    if callable(flush) and flush():
+                        return self._emit_activation("orion")
             return None
 
     def _emit_activation(self, trigger):
