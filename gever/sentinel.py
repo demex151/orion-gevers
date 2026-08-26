@@ -61,6 +61,12 @@ class SentinelMonitor:
             self._activation_sent = False
             self._voice_started = False
             self._last_voice_at = None
+            reset_clap = getattr(self.clap_detector, "reset", None)
+            if callable(reset_clap):
+                reset_clap()
+            reset_wake = getattr(self.wake_detector, "reset", None)
+            if callable(reset_wake):
+                reset_wake()
             self.error = None
             factory = self._stream_factory or self._default_stream_factory
             try:
