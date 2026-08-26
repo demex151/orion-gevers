@@ -14,6 +14,7 @@ from gever.clap import ClapDetector
 from gever.commands import is_close_session_command
 from gever.conversation_audio import ConversationAudioState
 from gever.listen import GeversListener
+from gever.local_audio import local_audio_player
 from gever.orion_phrase_engine import create_orion_phrase_engine
 from gever.sentinel import SentinelMonitor
 from gever.session import SessionController, SessionState
@@ -35,6 +36,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-GEVER-Local-Playback"],
 )
 
 brain = GeversBrain()
@@ -244,10 +246,19 @@ async def text_to_speech(request: SpeakRequest):
             volume=VOICE_VOLUME,
         )
         await communicator.save(temp_path)
+
+        playback = local_audio_player.play_mp3(temp_path)
+        played_locally = bool(playback.get("played"))
+        if played_locally:
+            print(f"[TTS LOCAL]: reproducido por {playback.get('backend', 'audio-local')}")
+        else:
+            print(f"[TTS LOCAL]: no disponible ({playback.get('reason', 'desconocido')})")
+
         return FileResponse(
             path=temp_path,
             media_type="audio/mpeg",
             filename="gever-response.mp3",
+            headers={"X-GEVER-Local-Playback": "1" if played_locally else "0"},
             background=BackgroundTask(remove_temp_file, temp_path),
         )
     except Exception:
