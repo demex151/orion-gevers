@@ -38,3 +38,34 @@ test("resolves after audio ends", async () => {
   assert.equal(result.played, true);
   assert.equal(result.blocked, false);
 });
+
+test("aborting playback pauses audio once and resolves as interrupted", async () => {
+  const abortController = new AbortController();
+  let pauseCalls = 0;
+  let revoked = 0;
+
+  const audio = {
+    currentTime: 12,
+    play: async () => {
+      queueMicrotask(() => abortController.abort());
+    },
+    pause: () => {
+      pauseCalls += 1;
+    },
+  };
+
+  const result = await playAudioBlob(new Blob(["x"]), {
+    signal: abortController.signal,
+    createAudio: () => audio,
+    createObjectURL: () => "blob:test",
+    revokeObjectURL: () => {
+      revoked += 1;
+    },
+  });
+
+  assert.equal(pauseCalls, 1);
+  assert.equal(audio.currentTime, 0);
+  assert.equal(revoked, 1);
+  assert.equal(result.interrupted, true);
+  assert.equal(result.played, false);
+});
