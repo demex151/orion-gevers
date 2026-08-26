@@ -38,6 +38,7 @@ class SessionController:
             if self.state == SessionState.SESSION:
                 return self.snapshot()
             self.sentinel.stop()
+            self.conversation.reset()
             self.last_trigger = trigger
             self.state = SessionState.SESSION
             return self.snapshot()
