@@ -1,9 +1,22 @@
 .gever-shell-root{position:relative;width:100vw;height:100vh;overflow:hidden;background:#01050d}
-.reference-home{position:absolute!important;left:50%!important;top:50%!important;width:1440px!important;height:1024px!important;min-width:1440px!important;min-height:1024px!important;max-width:none!important;max-height:none!important;overflow:hidden!important;transform:translate(-50%,-50%) scaleX(var(--gever-scale-x,1)) scaleY(var(--gever-scale-y,1))!important;transform-origin:center center!important;background:#020817 url("https://www.figma.com/api/mcp/asset/6d1efaae-941e-4f53-a6a8-b53d8cdea23b.png") center center/cover no-repeat!important}
+.reference-home{position:absolute!important;left:50%!important;top:50%!important;width:1440px!important;height:1024px!important;min-width:1440px!important;min-height:1024px!important;max-width:none!important;max-height:none!important;overflow:hidden!important;transform:translate(-50%,-50%) scale(var(--gever-scale,1))!important;transform-origin:center center!important;background:#020817 url("https://www.figma.com/api/mcp/asset/6d1efaae-941e-4f53-a6a8-b53d8cdea23b.png") center center/cover no-repeat!important}
 .reference-home:before,.reference-home:after{content:none!important;display:none!important}
-.reference-sidebar{height:1024px!important;bottom:auto!important}
-.reference-topbar{width:1222px!important;right:auto!important}
-.reference-center{width:826px!important;right:auto!important;bottom:auto!important;height:914px!important}
+.reference-sidebar{left:0!important;top:0!important;bottom:0!important;width:218px!important;height:1024px!important}
+.reference-topbar{left:218px!important;right:0!important;top:0!important;width:auto!important;height:72px!important}
+.system-card{left:235px!important;top:85px!important;width:260px!important;height:350px!important}
+.growth-card{left:235px!important;top:452px!important;width:260px!important;height:350px!important}
+.reference-center{left:520px!important;right:350px!important;top:85px!important;bottom:25px!important;width:auto!important;height:auto!important}
+.reference-orb{width:300px!important;height:300px!important;margin:5px auto -20px!important}
+.ring-a{width:275px!important;height:275px!important}
+.ring-b{width:225px!important;height:225px!important}
+.ring-c{width:176px!important;height:176px!important}
+.orb-axis.horizontal{width:310px!important;height:1px!important}
+.orb-axis.vertical{width:1px!important;height:310px!important}
+.orb-globe{width:142px!important;height:142px!important}
+.reference-quick-actions button{padding:0 14px!important}
+.lower-card{top:605px!important;width:48%!important;height:190px!important}
+.recent-card{right:20px!important;top:85px!important;width:330px!important;height:390px!important}
+.agents-card{right:20px!important;top:493px!important;width:330px!important;height:390px!important}
 .system-card,.growth-card,.recent-card,.agents-card,.lower-card{box-sizing:border-box!important;overflow:hidden!important}
 .reference-command,.reference-quick-actions{box-sizing:border-box!important}
 .reference-command input{min-width:0!important}
