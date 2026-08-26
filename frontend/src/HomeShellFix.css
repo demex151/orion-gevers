@@ -1,0 +1,16 @@
+.gever-shell-root{position:relative;width:100vw;height:100vh;overflow:hidden;background:#01050d}
+.reference-home{--gever-scale:min(1,calc(100vw / 1440px),calc(100vh / 1024px));position:absolute!important;left:50%!important;top:50%!important;width:1440px!important;height:1024px!important;min-height:1024px!important;max-width:none!important;overflow:hidden!important;transform:translate(-50%,-50%) scale(var(--gever-scale))!important;transform-origin:center center!important;background:#020817 url("https://www.figma.com/api/mcp/asset/6d1efaae-941e-4f53-a6a8-b53d8cdea23b.png") center center/cover no-repeat!important}
+.reference-home:before,.reference-home:after{content:none!important;display:none!important}
+.reference-sidebar{height:1024px!important;bottom:auto!important}
+.reference-topbar{width:1222px!important;right:auto!important}
+.reference-center{width:826px!important;right:auto!important;bottom:auto!important;height:914px!important}
+.system-card,.growth-card,.recent-card,.agents-card,.lower-card{box-sizing:border-box!important;overflow:hidden!important}
+.system-card{height:342px!important}
+.growth-card{height:350px!important}
+.recent-card{height:390px!important}
+.agents-card{height:390px!important}
+.lower-card{height:190px!important}
+.reference-command,.reference-quick-actions{box-sizing:border-box!important}
+.reference-command input{min-width:0!important}
+@supports not (scale:calc(100vh / 1024px)){.reference-home{transform:translate(-50%,-50%) scale(.84)!important}}
+@media (min-height:1000px) and (min-width:1400px){.reference-home{transform:translate(-50%,-50%) scale(1)!important}}
