@@ -22,7 +22,6 @@ from gever.speech_director import GeversSpeechDirector
 from gever.voice import GeversVoice, VOICE, VOICE_RATE, VOICE_PITCH, VOICE_VOLUME
 from gever.wakeword import WakeWordDetector
 
-
 app = FastAPI(title="GEVER Backend", version="2.0.0")
 
 app.add_middleware(
@@ -36,7 +35,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-GEVER-Local-Playback"],
 )
 
 brain = GeversBrain()
@@ -44,12 +42,10 @@ listener = GeversListener()
 voice_cleaner = GeversVoice()
 speech_director = GeversSpeechDirector()
 conversation_audio = ConversationAudioState()
-
 clap_detector = ClapDetector()
 wake_detector = WakeWordDetector(engine_factory=create_orion_phrase_engine, keyword="orion")
 sentinel = SentinelMonitor(clap_detector, wake_detector)
 session_controller = SessionController(sentinel, conversation_audio)
-
 microphone_lock = threading.Lock()
 
 
@@ -161,34 +157,26 @@ def chat(request: ChatRequest):
 def _capture_session_utterance():
     if session_controller.state != SessionState.SESSION:
         return {"ok": False, "inactive": True, "error": "GEVER no está en una sesión activa."}
-
     if not conversation_audio.begin():
         return {"ok": False, "closed": True, "error": "La sesión está cerrándose."}
-
     try:
         with microphone_lock:
             text = listener.listen()
     finally:
         conversation_audio.finish()
-
     if conversation_audio.cancel_requested:
         return {"ok": False, "closed": True, "discarded": True}
-
     if not text:
         return {"ok": False, "error": "No se detectó ninguna frase."}
-
     if text.startswith("ERROR_RECONOCIMIENTO:"):
         return {"ok": False, "error": text}
-
     print(f"[CONVERSACION] Escuchado: {text}")
-
     if is_close_session_command(text):
         try:
             result = session_controller.close_session("voice")
             return {"ok": True, "closed": True, "text": text, **result}
         except Exception as exc:
             return {"ok": False, "closed": True, "error": str(exc)}
-
     return {"ok": True, "closed": False, "text": text}
 
 
@@ -199,19 +187,29 @@ def session_listen():
 
 @app.post("/api/listen")
 def listen_legacy():
-    return _capture_session_utterance()
+    # The old React controller must never own the microphone. HomeShell and
+    # SessionController are now the single source of truth for voice sessions.
+    return {
+        "ok": False,
+        "inactive": True,
+        "legacy_disabled": True,
+        "error": "Controlador de voz heredado desactivado.",
+    }
 
 
 @app.post("/api/wake-listen")
 def wake_listen_legacy():
+    # Prevent the hidden legacy App controller from mirroring an active session
+    # and starting its own TTS/listen loop.
     snapshot = session_controller.snapshot()
     return {
         "ok": True,
-        "activated": snapshot["state"] == SessionState.SESSION.value,
+        "activated": False,
         "heard": "",
         "command": "",
         "wake_word": "ORION",
         "legacy": True,
+        "legacy_disabled": True,
         **snapshot,
     }
 
@@ -227,16 +225,12 @@ def remove_temp_file(path):
 async def text_to_speech(request: SpeakRequest):
     directed_text = speech_director.direct(request.text)
     text = voice_cleaner.clean_for_speech(directed_text)
-
     if not text:
         return {"ok": False, "error": "Texto vacío después de limpiar."}
-
     print(f"[TTS DIRIGIDO]: {text}")
-
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     temp_path = temp_file.name
     temp_file.close()
-
     try:
         communicator = edge_tts.Communicate(
             text=text,
@@ -246,14 +240,12 @@ async def text_to_speech(request: SpeakRequest):
             volume=VOICE_VOLUME,
         )
         await communicator.save(temp_path)
-
         playback = local_audio_player.play_mp3(temp_path)
         played_locally = bool(playback.get("played"))
         if played_locally:
             print(f"[TTS LOCAL]: reproducido por {playback.get('backend', 'audio-local')}")
         else:
             print(f"[TTS LOCAL]: no disponible ({playback.get('reason', 'desconocido')})")
-
         return FileResponse(
             path=temp_path,
             media_type="audio/mpeg",
