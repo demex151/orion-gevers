@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import App from "./App.jsx";
+import { createSessionClient } from "./sessionClient.js";
+import { uiStateForSession } from "./sessionFlow.js";
 import "./HomeShellFix.css";
 
 const API="http://127.0.0.1:8000";
+const sessionClient=createSessionClient(API);
 const FIGMA_BG="https://www.figma.com/api/mcp/asset/35c2b6c1-77e1-4593-98b7-ac82a2b0d542";
 const FIGMA_BG_ALT="https://www.figma.com/api/mcp/asset/16911c84-b5b0-4d39-9f40-c04cafd4f426.png";
 const ORB_OUTER_1="https://www.figma.com/api/mcp/asset/9dac0c5f-cac6-4862-8608-dda298b68f8e.svg";
@@ -23,10 +26,75 @@ function clickLegacyNav(label){Array.from(document.querySelectorAll(".legacy-app
 export default function HomeShell(){
   const[homeVisible,setHomeVisible]=useState(true);
   const[command,setCommand]=useState("");
-  const[status,setStatus]=useState("Escuchando");
+  const[sessionState,setSessionState]=useState("SENTINEL");
+  const[status,setStatus]=useState("Esperando ORION o doble aplauso");
   const[busy,setBusy]=useState(false);
+  const[subtitle,setSubtitle]=useState("");
+  const loopRunning=useRef(false);
+  const mounted=useRef(true);
 
-  useEffect(()=>{const timer=setInterval(()=>{if(busy)return;const s=document.querySelector(".legacy-app .core-status")?.textContent?.trim();if(s)setStatus(s==="ESPERANDO ORION"?"Escuchando":s)},250);return()=>clearInterval(timer)},[busy]);
+  useEffect(()=>()=>{mounted.current=false},[]);
+
+  useEffect(()=>{
+    let cancelled=false;
+    async function sync(){
+      try{
+        const data=await sessionClient.status();
+        if(cancelled||!mounted.current)return;
+        setSessionState(data.state||"SENTINEL");
+        if(!busy)setStatus(uiStateForSession(data.state).label);
+      }catch(error){
+        if(!cancelled&&mounted.current&&!busy)setStatus("Backend desconectado");
+      }
+    }
+    sync();
+    const timer=setInterval(sync,700);
+    return()=>{cancelled=true;clearInterval(timer)};
+  },[busy]);
+
+  useEffect(()=>{
+    if(sessionState!=="SESSION"||loopRunning.current)return;
+    let cancelled=false;
+    loopRunning.current=true;
+    async function conversationLoop(){
+      while(!cancelled&&mounted.current){
+        let heard;
+        try{
+          setStatus("Escuchando");
+          heard=await sessionClient.listen();
+        }catch(error){
+          if(!cancelled&&mounted.current)setStatus("Error de micrófono");
+          break;
+        }
+        if(cancelled||!mounted.current)break;
+        if(heard?.closed){
+          setSessionState("SENTINEL");
+          setStatus("Esperando ORION o doble aplauso");
+          setSubtitle("");
+          break;
+        }
+        const text=String(heard?.text||"").trim();
+        if(!heard?.ok||!text)continue;
+        setSubtitle(text);
+        setStatus("Pensando");
+        try{
+          const response=await fetch(`${API}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+          const data=await response.json();
+          if(!response.ok||data?.ok===false)throw new Error(data?.error||"GEVER no pudo responder");
+          const answer=String(data?.answer||"").trim();
+          if(!answer)throw new Error("GEVER respondió vacío");
+          setSubtitle(answer);
+          await speak(answer);
+        }catch(error){
+          console.error("[GEVER SESSION]",error);
+          setStatus("Error de conexión");
+        }
+      }
+      loopRunning.current=false;
+    }
+    conversationLoop();
+    return()=>{cancelled=true;loopRunning.current=false};
+  },[sessionState]);
 
   function openSection(section){if(section==="inicio"){clickLegacyNav("Inicio");setHomeVisible(true);return}if(section==="memoria"){clickLegacyNav("Memoria");setHomeVisible(false)}}
 
@@ -38,12 +106,13 @@ export default function HomeShell(){
     const url=URL.createObjectURL(blob);
     const audio=new Audio(url);
     await new Promise((resolve,reject)=>{audio.onplaying=()=>setStatus("Hablando");audio.onended=()=>{URL.revokeObjectURL(url);resolve()};audio.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("No se pudo reproducir la voz"))};audio.play().catch(reject)});
+    if(mounted.current)setStatus("Escuchando");
   }
 
   async function sendCommand(){
     const value=command.trim();
     if(!value||busy)return;
-    setBusy(true);setCommand("");setStatus("Pensando");
+    setBusy(true);setCommand("");setSubtitle(value);setStatus("Pensando");
     try{
       const response=await fetch(`${API}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:value})});
       if(!response.ok)throw new Error(`Chat respondió ${response.status}`);
@@ -51,10 +120,22 @@ export default function HomeShell(){
       if(data?.ok===false)throw new Error(data.error||"GEVER no pudo responder");
       const answer=String(data?.answer||"").trim();
       if(!answer)throw new Error("GEVER respondió vacío");
+      setSubtitle(answer);
       await speak(answer);
-      setStatus("Escuchando");
     }catch(error){console.error("[GEVER HOME]",error);setStatus("Error de conexión")}
     finally{setBusy(false)}
+  }
+
+  async function endSession(){
+    if(sessionState!=="SESSION")return;
+    setStatus("Cerrando conversación");
+    try{
+      const data=await sessionClient.close();
+      if(data?.ok===false)throw new Error(data.error||"No se pudo cerrar la sesión");
+      setSessionState("SENTINEL");
+      setSubtitle("");
+      setStatus("Esperando ORION o doble aplauso");
+    }catch(error){console.error("[GEVER CLOSE]",error);setStatus("No se pudo cerrar")}
   }
 
   return <div className="gever-shell-root">
@@ -69,8 +150,10 @@ export default function HomeShell(){
       <section className="figma-os figma-panel"><div className="figma-panel-head"><b>Sistema operativo</b><span>•••</span></div><div className="figma-donut"><div><b>98%</b><small>Óptimo</small></div></div><div className="figma-stats">{[["CPU","42%"],["Memoria","68%"],["Red","23%"],["Almacenamiento","71%"]].map(([a,b])=><p key={a}><span>{a}</span><b>{b}</b></p>)}</div><hr/><div className="figma-panel-foot"><span>Rendimiento del sistema</span><b>Excelente</b></div></section>
       <section className="figma-growth figma-panel"><div className="figma-panel-head"><div><b>Crecimiento</b><small>Resumen de 30 días</small></div><span>▦</span></div><strong className="figma-growth-number">+24.6%</strong><small className="figma-muted">vs. período anterior</small><svg className="figma-spark" viewBox="0 0 222 50"><polyline points="0,39 22,34 43,39 66,25 89,30 112,18 136,22 158,12 185,17 222,4" fill="none" stroke="#61e8ff" strokeWidth="2"/></svg><hr/><div className="figma-growth-rows">{[["Ingresos","$ 128,450","+18.2%"],["Clientes nuevos","342","+27.1%"],["Retención","92%","+8.4%"]].map(([a,b,c])=><p key={a}><span>{a}</span><b>{b}<small>{c}</small></b></p>)}</div></section>
       <div className="figma-greeting"><h1>Buenas noches, José</h1><p>¿En qué trabajamos hoy?</p></div>
-      <div className="figma-orb-visualizer"><div className="figma-orb-wrap"><img className="orb outer1" src={ORB_OUTER_1} alt=""/><img className="orb outer2" src={ORB_OUTER_2} alt=""/><img className="orb medium" src={ORB_MEDIUM} alt=""/><img className="orb axis" src={ORB_AXIS} alt=""/><img className="orb dot left" src={ORB_DOT} alt=""/><img className="orb dot right" src={ORB_DOT} alt=""/><img className="orb halo1" src={ORB_HALO_1} alt=""/><img className="orb halo2" src={ORB_HALO_2} alt=""/><img className="orb globe" src={ORB_GLOBE} alt=""/><img className="orb flare" src={ORB_FLARE} alt=""/><i className="tick top"/><i className="tick bottom"/></div></div>
+      <div className={`figma-orb-visualizer ${status==="Hablando"?"is-speaking":""}`}><div className="figma-orb-wrap"><img className="orb outer1" src={ORB_OUTER_1} alt=""/><img className="orb outer2" src={ORB_OUTER_2} alt=""/><img className="orb medium" src={ORB_MEDIUM} alt=""/><img className="orb axis" src={ORB_AXIS} alt=""/><img className="orb dot left" src={ORB_DOT} alt=""/><img className="orb dot right" src={ORB_DOT} alt=""/><img className="orb halo1" src={ORB_HALO_1} alt=""/><img className="orb halo2" src={ORB_HALO_2} alt=""/><img className="orb globe" src={ORB_GLOBE} alt=""/><img className="orb flare" src={ORB_FLARE} alt=""/><i className="tick top"/><i className="tick bottom"/></div></div>
       <div className="figma-listening"><b>{status}</b><span><i/><i/><i/><i/></span></div>
+      {subtitle&&<div className="figma-live-subtitle">{subtitle}</div>}
+      {sessionState==="SESSION"&&<button className="figma-end-session" onClick={endSession}>Finalizar conversación</button>}
       <div className="figma-command"><input disabled={busy} value={command} onChange={e=>setCommand(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();sendCommand()}}} placeholder="Escribe tu solicitud o comando..."/><button disabled={busy} onClick={sendCommand}>↑</button></div>
       <div className="figma-actions"><button>⌕ Analizar datos</button><button>♧ Generar informe</button><button>▦ Revisar estrategia</button><button>••• Crear contenido</button></div>
       <section className="figma-calendar"><div className="figma-section-head"><b>Calendario</b><span>Viernes, 23 de mayo</span></div>{[["09:00","Reunión de estrategia"],["11:30","Revisión de resultados"],["14:00","Presentación de proyecto"],["16:30","Análisis de mercado"]].map(([time,title],i)=><p key={time}><i className={`event-dot d${i}`}/><span>{time}</span><b>{title}</b></p>)}</section>
