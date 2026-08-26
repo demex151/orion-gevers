@@ -105,7 +105,7 @@ class LeadStore:
                      candidate.public_contact_method, candidate.recommended_action, candidate.validation_notes, lead_id))
             else:
                 lead_id = str(uuid4())
-                conn.execute("""INSERT INTO leads VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                conn.execute("""INSERT INTO leads VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                     lead_id, candidate.dedupe_key, candidate.classification.value, int(candidate.urgent), candidate.score,
                     LeadStatus.NEW.value, candidate.opportunity_type.value, candidate.name, candidate.organization,
                     candidate.location, candidate.service_requested_or_inferred, candidate.source_url, candidate.source_domain,
