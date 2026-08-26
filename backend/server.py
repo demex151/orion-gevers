@@ -59,17 +59,24 @@ app.add_middleware(
 # =========================================================
 
 brain = GeversBrain()
-
 listener = GeversListener()
-
 voice_cleaner = GeversVoice()
 
 
 # =========================================================
-# CONTROL DEL MICRÓFONO
+# CONTROL DEL MICRÓFONO + DIAGNÓSTICO TTS
 # =========================================================
 
 microphone_lock = threading.Lock()
+tts_counter_lock = threading.Lock()
+tts_request_counter = 0
+
+
+def next_tts_request_id():
+    global tts_request_counter
+    with tts_counter_lock:
+        tts_request_counter += 1
+        return tts_request_counter
 
 
 # =========================================================
@@ -90,7 +97,6 @@ class SpeakRequest(BaseModel):
 
 @app.get("/")
 def root():
-
     return {
         "name": "GEVER",
         "status": "online",
@@ -105,7 +111,6 @@ def root():
 
 @app.get("/api/status")
 def status():
-
     return {
         "status": "online",
         "brain": "ready",
@@ -125,16 +130,12 @@ def status():
 
 @app.get("/api/memories")
 def memories():
-
     try:
-
         return {
             "ok": True,
             "memories": brain.memories(),
         }
-
     except Exception as e:
-
         return {
             "ok": False,
             "error": str(e),
@@ -146,32 +147,22 @@ def memories():
 # =========================================================
 
 @app.post("/api/chat")
-def chat(
-    request: ChatRequest
-):
-
+def chat(request: ChatRequest):
     message = request.message.strip()
 
     if not message:
-
         return {
             "ok": False,
             "error": "Mensaje vacío",
         }
 
     try:
-
-        answer = brain.think(
-            message
-        )
-
+        answer = brain.think(message)
         return {
             "ok": True,
             "answer": answer,
         }
-
     except Exception as e:
-
         return {
             "ok": False,
             "error": str(e),
@@ -183,17 +174,7 @@ def chat(
 # =========================================================
 
 def remove_accents(text):
-    """
-    Convierte:
-        orión -> orion
-        conversación -> conversacion
-    """
-
-    normalized = unicodedata.normalize(
-        "NFD",
-        str(text)
-    )
-
+    normalized = unicodedata.normalize("NFD", str(text))
     return "".join(
         char
         for char in normalized
@@ -206,18 +187,10 @@ def remove_accents(text):
 # =========================================================
 
 def normalize_wake_text(text):
-
     if not text:
         return ""
 
-    normalized = str(text).lower()
-
-    # IMPORTANTE:
-    # orión -> orion
-    normalized = remove_accents(
-        normalized
-    )
-
+    normalized = remove_accents(str(text).lower())
     normalized = (
         normalized
         .replace("¿", "")
@@ -229,13 +202,7 @@ def normalize_wake_text(text):
         .replace(":", " ")
         .replace(";", " ")
     )
-
-    normalized = re.sub(
-        r"\s+",
-        " ",
-        normalized
-    )
-
+    normalized = re.sub(r"\s+", " ", normalized)
     return normalized.strip()
 
 
@@ -244,37 +211,19 @@ def normalize_wake_text(text):
 # =========================================================
 
 def detect_wake_word(text):
-
-    normalized = normalize_wake_text(
-        text
-    )
-
-    print(
-        f"[WAKE NORMALIZADO]: {normalized}"
-    )
+    normalized = normalize_wake_text(text)
+    print(f"[WAKE NORMALIZADO]: {normalized}")
 
     if not normalized:
-
         return False, ""
 
     words = normalized.split()
 
     if WAKE_WORD not in words:
-
         return False, ""
 
-    position = words.index(
-        WAKE_WORD
-    )
-
-    command_words = words[
-        position + 1:
-    ]
-
-    command = " ".join(
-        command_words
-    ).strip()
-
+    position = words.index(WAKE_WORD)
+    command = " ".join(words[position + 1:]).strip()
     return True, command
 
 
@@ -284,44 +233,32 @@ def detect_wake_word(text):
 
 @app.post("/api/listen")
 def listen():
-
     try:
-
         with microphone_lock:
-
             text = listener.listen(
                 timeout=None,
                 phrase_time_limit=None
             )
 
         if not text:
-
             return {
                 "ok": False,
-                "error":
-                    "No se detectó ninguna frase.",
+                "error": "No se detectó ninguna frase.",
             }
 
-        if text.startswith(
-            "ERROR_RECONOCIMIENTO:"
-        ):
-
+        if text.startswith("ERROR_RECONOCIMIENTO:"):
             return {
                 "ok": False,
                 "error": text,
             }
 
-        print(
-            f"[CONVERSACION] Escuchado: {text}"
-        )
-
+        print(f"[CONVERSACION] Escuchado: {text}")
         return {
             "ok": True,
             "text": text,
         }
 
     except Exception as e:
-
         return {
             "ok": False,
             "error": str(e),
@@ -334,15 +271,11 @@ def listen():
 
 @app.post("/api/wake-listen")
 def wake_listen():
-
     try:
-
         with microphone_lock:
-
             text = listener.listen_wake()
 
         if not text:
-
             return {
                 "ok": True,
                 "activated": False,
@@ -351,10 +284,7 @@ def wake_listen():
                 "wake_word": "ORION",
             }
 
-        if text.startswith(
-            "ERROR_RECONOCIMIENTO:"
-        ):
-
+        if text.startswith("ERROR_RECONOCIMIENTO:"):
             return {
                 "ok": False,
                 "activated": False,
@@ -364,31 +294,14 @@ def wake_listen():
                 "error": text,
             }
 
-        activated, command = (
-            detect_wake_word(
-                text
-            )
-        )
-
-        print(
-            f"[WAKE] Escuchado: {text}"
-        )
+        activated, command = detect_wake_word(text)
+        print(f"[WAKE] Escuchado: {text}")
 
         if activated:
-
-            print(
-                "[WAKE] ORION DETECTADO"
-            )
-
-            print(
-                "[WAKE] GEVER ACTIVADO"
-            )
-
+            print("[WAKE] ORION DETECTADO")
+            print("[WAKE] GEVER ACTIVADO")
             if command:
-
-                print(
-                    f"[WAKE] Instrucción: {command}"
-                )
+                print(f"[WAKE] Instrucción: {command}")
 
         return {
             "ok": True,
@@ -399,7 +312,6 @@ def wake_listen():
         }
 
     except Exception as e:
-
         return {
             "ok": False,
             "activated": False,
@@ -415,15 +327,9 @@ def wake_listen():
 # =========================================================
 
 def remove_temp_file(path):
-
     try:
-
-        os.remove(
-            path
-        )
-
+        os.remove(path)
     except OSError:
-
         pass
 
 
@@ -432,55 +338,41 @@ def remove_temp_file(path):
 # =========================================================
 
 @app.post("/api/tts")
-async def text_to_speech(
-    request: SpeakRequest
-):
+async def text_to_speech(request: SpeakRequest):
+    request_id = next_tts_request_id()
 
-    text = (
-        voice_cleaner
-        .clean_for_speech(
-            request.text
-        )
+    text = voice_cleaner.clean_for_speech(request.text)
+
+    print(
+        f"[TTS REQUEST #{request_id}] "
+        f"chars={len(text)} text={text[:120]!r}"
     )
 
     if not text:
-
+        print(f"[TTS REQUEST #{request_id}] RECHAZADO: texto vacío")
         return {
             "ok": False,
-            "error":
-                "Texto vacío después de limpiar.",
+            "error": "Texto vacío después de limpiar.",
         }
 
-    print(
-        f"[TTS LIMPIO]: {text}"
+    temp_file = tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=".mp3"
     )
-
-    temp_file = (
-        tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=".mp3"
-        )
-    )
-
     temp_path = temp_file.name
-
     temp_file.close()
 
     try:
-
-        communicator = (
-            edge_tts.Communicate(
-                text=text,
-                voice=VOICE,
-                rate=VOICE_RATE,
-                pitch=VOICE_PITCH,
-                volume=VOICE_VOLUME,
-            )
+        communicator = edge_tts.Communicate(
+            text=text,
+            voice=VOICE,
+            rate=VOICE_RATE,
+            pitch=VOICE_PITCH,
+            volume=VOICE_VOLUME,
         )
 
-        await communicator.save(
-            temp_path
-        )
+        await communicator.save(temp_path)
+        print(f"[TTS REQUEST #{request_id}] AUDIO GENERADO")
 
         return FileResponse(
             path=temp_path,
@@ -492,10 +384,10 @@ async def text_to_speech(
             ),
         )
 
-    except Exception:
-
-        remove_temp_file(
-            temp_path
+    except Exception as error:
+        print(
+            f"[TTS REQUEST #{request_id}] ERROR: "
+            f"{type(error).__name__}: {error}"
         )
-
+        remove_temp_file(temp_path)
         raise
