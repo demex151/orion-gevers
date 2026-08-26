@@ -23,6 +23,7 @@ class FakeConversation:
         self.events = events
         self.active = False
         self.cancelled = 0
+        self.reset_count = 0
 
     @property
     def is_active(self):
@@ -32,6 +33,10 @@ class FakeConversation:
         self.events.append("conversation:cancel")
         self.cancelled += 1
         self.active = False
+
+    def reset(self):
+        self.events.append("conversation:reset")
+        self.reset_count += 1
 
 
 class SessionControllerTests(unittest.TestCase):
@@ -48,21 +53,23 @@ class SessionControllerTests(unittest.TestCase):
         self.assertTrue(sentinel.running)
         self.assertFalse(conversation.is_active)
 
-    def test_open_session_stops_sentinel_first(self):
-        events, sentinel, _, controller = self.make_controller()
+    def test_open_session_stops_sentinel_then_resets_conversation(self):
+        events, sentinel, conversation, controller = self.make_controller()
         controller.start()
         events.clear()
         controller.open_session("clap")
-        self.assertEqual(events[0], "sentinel:stop")
+        self.assertEqual(events[:2], ["sentinel:stop", "conversation:reset"])
+        self.assertEqual(conversation.reset_count, 1)
         self.assertFalse(sentinel.running)
         self.assertEqual(controller.state, SessionState.SESSION)
         self.assertEqual(controller.last_trigger, "clap")
 
     def test_orion_opens_session_without_clap(self):
-        _, sentinel, _, controller = self.make_controller()
+        _, sentinel, conversation, controller = self.make_controller()
         controller.start()
         controller.open_session("orion")
         self.assertFalse(sentinel.running)
+        self.assertEqual(conversation.reset_count, 1)
         self.assertEqual(controller.state, SessionState.SESSION)
         self.assertEqual(controller.last_trigger, "orion")
 
@@ -74,7 +81,7 @@ class SessionControllerTests(unittest.TestCase):
         events.clear()
         controller.close_session("voice")
         self.assertEqual(events[:2], ["conversation:cancel", "sentinel:start"])
-        self.assertEqual(conversation.cancelled, 1)
+        self.assertEqual(conversation.cancelled, 2)
         self.assertTrue(sentinel.running)
         self.assertEqual(controller.state, SessionState.SENTINEL)
 
