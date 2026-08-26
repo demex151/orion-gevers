@@ -3,6 +3,7 @@ import App from "./App.jsx";
 import { createSessionClient } from "./sessionClient.js";
 import { uiStateForSession } from "./sessionFlow.js";
 import { playAudioBlob } from "./audioPlayback.js";
+import { createBargeInController } from "./bargeInController.js";
 import "./HomeShellFix.css";
 
 const API="http://127.0.0.1:8000";
@@ -30,7 +31,13 @@ export default function HomeShell(){
   const[subtitle,setSubtitle]=useState("");
   const loopRunning=useRef(false);
   const mounted=useRef(true);
-  useEffect(()=>()=>{mounted.current=false},[]);
+  const bargeIn=useRef(null);
+  const playbackAbort=useRef(null);
+  useEffect(()=>()=>{
+    mounted.current=false;
+    playbackAbort.current?.abort();
+    bargeIn.current?.stop?.();
+  },[]);
 
   useEffect(()=>{
     let cancelled=false;
@@ -92,13 +99,45 @@ export default function HomeShell(){
       if(mounted.current)setTimeout(()=>mounted.current&&setStatus("Escuchando"),350);
       return;
     }
-    const result=await playAudioBlob(blob,{onPlaying:()=>mounted.current&&setStatus("Hablando")});
-    if(result?.blocked){
-      console.warn("[GEVER AUDIO] El navegador bloqueó autoplay y el audio local no estuvo disponible",result.error);
-      setStatus("Audio bloqueado");
-      throw result.error||new Error("Autoplay bloqueado");
+
+    const abortController=new AbortController();
+    playbackAbort.current=abortController;
+    let detector=null;
+    try{
+      if(sessionState==="SESSION"){
+        detector=createBargeInController();
+        bargeIn.current=detector;
+        try{
+          await detector.start({onSpeech:async()=>{
+            if(!abortController.signal.aborted){
+              setStatus("Interrumpido · escuchando");
+              abortController.abort();
+            }
+          }});
+        }catch(error){
+          console.warn("[GEVER BARGE-IN] Detector no disponible; continúa el modo normal",error);
+          detector=null;
+          bargeIn.current=null;
+        }
+      }
+
+      const result=await playAudioBlob(blob,{signal:abortController.signal,onPlaying:()=>mounted.current&&setStatus("Hablando")});
+      if(result?.blocked){
+        console.warn("[GEVER AUDIO] El navegador bloqueó autoplay y el audio local no estuvo disponible",result.error);
+        setStatus("Audio bloqueado");
+        throw result.error||new Error("Autoplay bloqueado");
+      }
+      if(result?.interrupted){
+        if(mounted.current)setStatus("Escuchando");
+        return {interrupted:true};
+      }
+      if(mounted.current)setStatus("Escuchando");
+      return {interrupted:false};
+    }finally{
+      await detector?.stop?.();
+      if(bargeIn.current===detector)bargeIn.current=null;
+      if(playbackAbort.current===abortController)playbackAbort.current=null;
     }
-    if(mounted.current)setStatus("Escuchando");
   }
 
   async function sendCommand(){
@@ -119,6 +158,8 @@ export default function HomeShell(){
 
   async function endSession(){
     if(sessionState!=="SESSION")return;
+    playbackAbort.current?.abort();
+    await bargeIn.current?.stop?.();
     setStatus("Cerrando conversación");
     try{
       const data=await sessionClient.close();
