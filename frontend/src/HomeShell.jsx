@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import App from "./App.jsx";
-import { createSubtitleChunks, subtitleAtTime } from "./speechVisuals.js";
 import "./HomeShellFix.css";
 
 const API="http://127.0.0.1:8000";
@@ -26,35 +25,25 @@ export default function HomeShell(){
   const[command,setCommand]=useState("");
   const[status,setStatus]=useState("Escuchando");
   const[busy,setBusy]=useState(false);
-  const[subtitle,setSubtitle]=useState("");
-  const[speaking,setSpeaking]=useState(false);
 
   useEffect(()=>{const timer=setInterval(()=>{if(busy)return;const s=document.querySelector(".legacy-app .core-status")?.textContent?.trim();if(s)setStatus(s==="ESPERANDO ORION"?"Escuchando":s)},250);return()=>clearInterval(timer)},[busy]);
 
   function openSection(section){if(section==="inicio"){clickLegacyNav("Inicio");setHomeVisible(true);return}if(section==="memoria"){clickLegacyNav("Memoria");setHomeVisible(false)}}
 
   async function speak(text){
-    const chunks=createSubtitleChunks(text);
-    setSubtitle(chunks[0]||"");
     setStatus("Preparando voz");
     const response=await fetch(`${API}/api/tts`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
     if(!response.ok)throw new Error(`TTS respondió ${response.status}`);
     const blob=await response.blob();
     const url=URL.createObjectURL(blob);
     const audio=new Audio(url);
-    await new Promise((resolve,reject)=>{
-      audio.onplaying=()=>{setSpeaking(true);setStatus("Hablando")};
-      audio.ontimeupdate=()=>setSubtitle(subtitleAtTime(chunks,audio.currentTime,audio.duration));
-      audio.onended=()=>{setSpeaking(false);setSubtitle("");URL.revokeObjectURL(url);resolve()};
-      audio.onerror=()=>{setSpeaking(false);setSubtitle("");URL.revokeObjectURL(url);reject(new Error("No se pudo reproducir la voz"))};
-      audio.play().catch(error=>{setSpeaking(false);setSubtitle("");reject(error)});
-    });
+    await new Promise((resolve,reject)=>{audio.onplaying=()=>setStatus("Hablando");audio.onended=()=>{URL.revokeObjectURL(url);resolve()};audio.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("No se pudo reproducir la voz"))};audio.play().catch(reject)});
   }
 
   async function sendCommand(){
     const value=command.trim();
     if(!value||busy)return;
-    setBusy(true);setCommand("");setStatus("Pensando");setSubtitle("");
+    setBusy(true);setCommand("");setStatus("Pensando");
     try{
       const response=await fetch(`${API}/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:value})});
       if(!response.ok)throw new Error(`Chat respondió ${response.status}`);
@@ -62,14 +51,11 @@ export default function HomeShell(){
       if(data?.ok===false)throw new Error(data.error||"GEVER no pudo responder");
       const answer=String(data?.answer||"").trim();
       if(!answer)throw new Error("GEVER respondió vacío");
-      setSubtitle(createSubtitleChunks(answer)[0]||answer);
       await speak(answer);
       setStatus("Escuchando");
-    }catch(error){console.error("[GEVER HOME]",error);setSpeaking(false);setSubtitle("");setStatus("Error de conexión")}
+    }catch(error){console.error("[GEVER HOME]",error);setStatus("Error de conexión")}
     finally{setBusy(false)}
   }
-
-  const thinking=busy&&!speaking;
 
   return <div className="gever-shell-root">
     <div className={homeVisible?"legacy-app legacy-hidden":"legacy-app legacy-visible"}><App/></div>
@@ -82,9 +68,9 @@ export default function HomeShell(){
       <header className="figma-header"><div className="figma-status"><span>● Sistema operativo</span><span>● Todo bajo control</span></div><div className="figma-toolbar"><span>⌕</span><span>▦</span><span>♧</span><b>+</b></div></header>
       <section className="figma-os figma-panel"><div className="figma-panel-head"><b>Sistema operativo</b><span>•••</span></div><div className="figma-donut"><div><b>98%</b><small>Óptimo</small></div></div><div className="figma-stats">{[["CPU","42%"],["Memoria","68%"],["Red","23%"],["Almacenamiento","71%"]].map(([a,b])=><p key={a}><span>{a}</span><b>{b}</b></p>)}</div><hr/><div className="figma-panel-foot"><span>Rendimiento del sistema</span><b>Excelente</b></div></section>
       <section className="figma-growth figma-panel"><div className="figma-panel-head"><div><b>Crecimiento</b><small>Resumen de 30 días</small></div><span>▦</span></div><strong className="figma-growth-number">+24.6%</strong><small className="figma-muted">vs. período anterior</small><svg className="figma-spark" viewBox="0 0 222 50"><polyline points="0,39 22,34 43,39 66,25 89,30 112,18 136,22 158,12 185,17 222,4" fill="none" stroke="#61e8ff" strokeWidth="2"/></svg><hr/><div className="figma-growth-rows">{[["Ingresos","$ 128,450","+18.2%"],["Clientes nuevos","342","+27.1%"],["Retención","92%","+8.4%"]].map(([a,b,c])=><p key={a}><span>{a}</span><b>{b}<small>{c}</small></b></p>)}</div></section>
-      <div className={`figma-greeting ${subtitle?"speaking-copy":""}`}><h1>{subtitle||"Buenas noches, José"}</h1><p>{subtitle?(speaking?"GEVER está hablando":status):"¿En qué trabajamos hoy?"}</p></div>
-      <div className={`figma-orb-visualizer ${speaking?"is-speaking":""} ${thinking?"is-thinking":""}`}><div className="figma-orb-wrap"><img className="orb outer1" src={ORB_OUTER_1} alt=""/><img className="orb outer2" src={ORB_OUTER_2} alt=""/><img className="orb medium" src={ORB_MEDIUM} alt=""/><img className="orb axis" src={ORB_AXIS} alt=""/><img className="orb dot left" src={ORB_DOT} alt=""/><img className="orb dot right" src={ORB_DOT} alt=""/><img className="orb halo1" src={ORB_HALO_1} alt=""/><img className="orb halo2" src={ORB_HALO_2} alt=""/><img className="orb globe" src={ORB_GLOBE} alt=""/><img className="orb flare" src={ORB_FLARE} alt=""/><i className="tick top"/><i className="tick bottom"/></div></div>
-      <div className={`figma-listening ${speaking?"is-speaking":""}`}><b>{status}</b><span><i/><i/><i/><i/></span></div>
+      <div className="figma-greeting"><h1>Buenas noches, José</h1><p>¿En qué trabajamos hoy?</p></div>
+      <div className="figma-orb-visualizer"><div className="figma-orb-wrap"><img className="orb outer1" src={ORB_OUTER_1} alt=""/><img className="orb outer2" src={ORB_OUTER_2} alt=""/><img className="orb medium" src={ORB_MEDIUM} alt=""/><img className="orb axis" src={ORB_AXIS} alt=""/><img className="orb dot left" src={ORB_DOT} alt=""/><img className="orb dot right" src={ORB_DOT} alt=""/><img className="orb halo1" src={ORB_HALO_1} alt=""/><img className="orb halo2" src={ORB_HALO_2} alt=""/><img className="orb globe" src={ORB_GLOBE} alt=""/><img className="orb flare" src={ORB_FLARE} alt=""/><i className="tick top"/><i className="tick bottom"/></div></div>
+      <div className="figma-listening"><b>{status}</b><span><i/><i/><i/><i/></span></div>
       <div className="figma-command"><input disabled={busy} value={command} onChange={e=>setCommand(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();sendCommand()}}} placeholder="Escribe tu solicitud o comando..."/><button disabled={busy} onClick={sendCommand}>↑</button></div>
       <div className="figma-actions"><button>⌕ Analizar datos</button><button>♧ Generar informe</button><button>▦ Revisar estrategia</button><button>••• Crear contenido</button></div>
       <section className="figma-calendar"><div className="figma-section-head"><b>Calendario</b><span>Viernes, 23 de mayo</span></div>{[["09:00","Reunión de estrategia"],["11:30","Revisión de resultados"],["14:00","Presentación de proyecto"],["16:30","Análisis de mercado"]].map(([time,title],i)=><p key={time}><i className={`event-dot d${i}`}/><span>{time}</span><b>{title}</b></p>)}</section>
