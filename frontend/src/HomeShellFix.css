@@ -1,22 +1,16 @@
 .gever-shell-root{position:relative;width:100vw;height:100vh;overflow:hidden;background:#01050d}
-.reference-home{position:absolute!important;left:50%!important;top:50%!important;width:1440px!important;height:1024px!important;min-width:1440px!important;min-height:1024px!important;max-width:none!important;max-height:none!important;overflow:hidden!important;transform:translate(-50%,-50%) scale(var(--gever-scale,1))!important;transform-origin:center center!important;background:#020817 url("https://www.figma.com/api/mcp/asset/6d1efaae-941e-4f53-a6a8-b53d8cdea23b.png") center center/cover no-repeat!important}
+.reference-home{position:absolute!important;left:50%!important;top:50%!important;width:1440px!important;height:1024px!important;min-width:1440px!important;min-height:1024px!important;max-width:none!important;max-height:none!important;overflow:hidden!important;transform:translate(-50%,-50%) scale(var(--gever-scale,1))!important;transform-origin:center center!important;background:#020817 url("https://www.figma.com/api/mcp/asset/ec161467-4d09-478e-a907-7d52970f8f0d.png") center/cover no-repeat!important}
 .reference-home:before,.reference-home:after{content:none!important;display:none!important}
-.reference-sidebar{left:0!important;top:0!important;bottom:0!important;width:218px!important;height:1024px!important}
-.reference-topbar{left:218px!important;right:0!important;top:0!important;width:auto!important;height:72px!important}
-.system-card{left:235px!important;top:85px!important;width:260px!important;height:350px!important}
-.growth-card{left:235px!important;top:452px!important;width:260px!important;height:350px!important}
-.reference-center{left:520px!important;right:350px!important;top:85px!important;bottom:25px!important;width:auto!important;height:auto!important}
-.reference-orb{width:300px!important;height:300px!important;margin:5px auto -20px!important}
-.ring-a{width:275px!important;height:275px!important}
-.ring-b{width:225px!important;height:225px!important}
-.ring-c{width:176px!important;height:176px!important}
-.orb-axis.horizontal{width:310px!important;height:1px!important}
-.orb-axis.vertical{width:1px!important;height:310px!important}
-.orb-globe{width:142px!important;height:142px!important}
-.reference-quick-actions button{padding:0 14px!important}
-.lower-card{top:605px!important;width:48%!important;height:190px!important}
-.recent-card{right:20px!important;top:85px!important;width:330px!important;height:390px!important}
-.agents-card{right:20px!important;top:493px!important;width:330px!important;height:390px!important}
-.system-card,.growth-card,.recent-card,.agents-card,.lower-card{box-sizing:border-box!important;overflow:hidden!important}
-.reference-command,.reference-quick-actions{box-sizing:border-box!important}
-.reference-command input{min-width:0!important}
+.reference-sidebar{left:15px!important;top:12px!important;bottom:auto!important;width:220px!important;height:1000px!important}
+.reference-topbar{left:251px!important;right:auto!important;top:52px!important;width:1172px!important;height:auto!important}
+.system-card{left:241px!important;top:123px!important;width:260px!important;height:auto!important}
+.growth-card{left:241px!important;top:483px!important;width:260px!important;height:auto!important}
+.reference-center{position:absolute!important;left:543px!important;right:auto!important;top:123px!important;bottom:auto!important;width:826px!important;height:820px!important}
+.reference-greeting{width:826px!important}
+.reference-orb{width:220px!important;height:220px!important;margin:38px auto 14px!important}
+.ring-a{width:330px!important;height:330px!important}.ring-b{width:260px!important;height:260px!important}.ring-c{width:210px!important;height:210px!important}
+.orb-axis.horizontal{width:310px!important;height:1px!important}.orb-axis.vertical{width:1px!important;height:310px!important}.orb-globe{width:190px!important;height:190px!important}
+.reference-command{width:826px!important;margin-left:6px!important}.reference-quick-actions{width:826px!important}.reference-quick-actions button{padding:0 16px!important}
+.lower-card{top:556px!important;height:190px!important;width:374px!important}.calendar-card{left:15px!important}.communications-card{left:447px!important}
+.agents-card{left:990px!important;right:auto!important;top:669px!important;width:320px!important;height:auto!important;max-height:330px!important}
+.system-card,.growth-card,.agents-card,.lower-card{box-sizing:border-box!important;overflow:hidden!important}.reference-command,.reference-quick-actions{box-sizing:border-box!important}.reference-command input{min-width:0!important}
