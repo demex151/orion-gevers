@@ -13,11 +13,10 @@ function clean(value = "") {
 
 export function buildLegacyVisualSnapshot({ statusText = "", subtitleLines = [], messages = [] } = {}) {
   const normalizedStatus = clean(statusText).toUpperCase();
-  const subtitle = (Array.isArray(subtitleLines) ? subtitleLines : [])
+  const lines = (Array.isArray(subtitleLines) ? subtitleLines : [])
     .map(clean)
-    .filter(Boolean)
-    .slice(-2)
-    .join(" ");
+    .filter(Boolean);
+  const subtitle = lines.at(-1) || "";
 
   const cleanMessages = (Array.isArray(messages) ? messages : [])
     .map((item) => ({ sender: clean(item?.sender), text: clean(item?.text) }))
