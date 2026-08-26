@@ -4,7 +4,10 @@ import speech_recognition as sr
 
 class GeversListener:
 
-    def __init__(self):
+    DEFAULT_TIMEOUT = 5
+    DEFAULT_PHRASE_TIME_LIMIT = 18
+
+    def __init__(self, calibrate=True):
 
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
@@ -14,35 +17,28 @@ class GeversListener:
         # =================================================
 
         self.recognizer.dynamic_energy_threshold = True
-
-        # Permite pausas naturales sin cortar demasiado rápido.
         self.recognizer.pause_threshold = 1.15
-
         self.recognizer.non_speaking_duration = 0.45
-
         self.recognizer.phrase_threshold = 0.18
-
 
         # =================================================
         # CALIBRACIÓN ÚNICA
         # =================================================
 
-        print("Calibrando micrófono...")
+        if calibrate:
+            print("Calibrando micrófono...")
 
-        with self.microphone as source:
+            with self.microphone as source:
+                self.recognizer.adjust_for_ambient_noise(
+                    source,
+                    duration=0.8
+                )
 
-            self.recognizer.adjust_for_ambient_noise(
-                source,
-                duration=0.8
+            print("Reconocimiento de voz listo.")
+            print(
+                f"Umbral de energía: "
+                f"{self.recognizer.energy_threshold}"
             )
-
-        print("Reconocimiento de voz listo.")
-
-        print(
-            f"Umbral de energía: "
-            f"{self.recognizer.energy_threshold}"
-        )
-
 
     # =====================================================
     # NORMALIZAR TEXTO
@@ -69,7 +65,6 @@ class GeversListener:
         ]
 
         for pattern in variants:
-
             corrected = re.sub(
                 pattern,
                 "GEVER",
@@ -79,7 +74,6 @@ class GeversListener:
 
         return corrected.strip()
 
-
     # =====================================================
     # RECONOCER AUDIO
     # =====================================================
@@ -87,121 +81,80 @@ class GeversListener:
     def recognize_audio(self, audio):
 
         try:
-
             text = self.recognizer.recognize_google(
                 audio,
                 language="es-US"
             )
 
-            text = self.normalize_text(
-                text
-            )
+            text = self.normalize_text(text)
 
             if text:
-
-                print(
-                    f"Escuchado: {text}"
-                )
+                print(f"Escuchado: {text}")
 
             return text
 
-
         except sr.UnknownValueError:
-
             return ""
 
-
         except sr.RequestError as e:
-
-            return (
-                "ERROR_RECONOCIMIENTO: "
-                f"{e}"
-            )
-
+            return "ERROR_RECONOCIMIENTO: " f"{e}"
 
         except Exception as e:
-
-            return (
-                "ERROR_RECONOCIMIENTO: "
-                f"{e}"
-            )
-
+            return "ERROR_RECONOCIMIENTO: " f"{e}"
 
     # =====================================================
     # CONVERSACIÓN NORMAL
     # =====================================================
 
-    def listen(
-        self,
-        timeout=None,
-        phrase_time_limit=None
-    ):
+    def listen(self, timeout=None, phrase_time_limit=None):
+        """Capture one bounded conversational utterance.
+
+        Finite defaults are intentional: they guarantee that an in-flight
+        speech_recognition capture returns control to SessionController, so a
+        close request can release the conversational microphone before the
+        local sentinel starts.
+        """
+
+        if timeout is None:
+            timeout = self.DEFAULT_TIMEOUT
+        if phrase_time_limit is None:
+            phrase_time_limit = self.DEFAULT_PHRASE_TIME_LIMIT
 
         try:
-
             with self.microphone as source:
-
-                print(
-                    "\nHabla ahora..."
-                )
-
+                print("\nHabla ahora...")
                 audio = self.recognizer.listen(
                     source,
                     timeout=timeout,
                     phrase_time_limit=phrase_time_limit
                 )
 
-            return self.recognize_audio(
-                audio
-            )
-
+            return self.recognize_audio(audio)
 
         except sr.WaitTimeoutError:
-
             return ""
 
-
         except Exception as e:
-
-            return (
-                "ERROR_RECONOCIMIENTO: "
-                f"{e}"
-            )
-
+            return "ERROR_RECONOCIMIENTO: " f"{e}"
 
     # =====================================================
-    # ORION
+    # LEGACY ORION — retained only for rollback diagnostics
     # =====================================================
 
     def listen_wake(self):
-
         try:
-
             with self.microphone as source:
-
-                print(
-                    "\n[WAKE] Esperando ORION..."
-                )
-
+                print("\n[WAKE] Esperando ORION...")
                 audio = self.recognizer.listen(
                     source,
                     timeout=8,
                     phrase_time_limit=8
                 )
 
-            return self.recognize_audio(
-                audio
-            )
-
+            return self.recognize_audio(audio)
 
         except sr.WaitTimeoutError:
-
             return ""
 
-
         except Exception as e:
-
-            return (
-                "ERROR_RECONOCIMIENTO: "
-                f"{e}"
-            )
+            return "ERROR_RECONOCIMIENTO: " f"{e}"
