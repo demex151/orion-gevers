@@ -14,6 +14,7 @@ from gever.clap import ClapDetector
 from gever.commands import is_close_session_command
 from gever.conversation_audio import ConversationAudioState
 from gever.listen import GeversListener
+from gever.orion_phrase_engine import create_orion_phrase_engine
 from gever.sentinel import SentinelMonitor
 from gever.session import SessionController, SessionState
 from gever.speech_director import GeversSpeechDirector
@@ -43,7 +44,7 @@ speech_director = GeversSpeechDirector()
 conversation_audio = ConversationAudioState()
 
 clap_detector = ClapDetector()
-wake_detector = WakeWordDetector(keyword="orion")
+wake_detector = WakeWordDetector(engine_factory=create_orion_phrase_engine, keyword="orion")
 sentinel = SentinelMonitor(clap_detector, wake_detector)
 session_controller = SessionController(sentinel, conversation_audio)
 
@@ -194,14 +195,11 @@ def session_listen():
     return _capture_session_utterance()
 
 
-# Legacy endpoint retained temporarily so the stable UI has a rollback path.
-# New frontend code must use /api/session/listen.
 @app.post("/api/listen")
 def listen_legacy():
     return _capture_session_utterance()
 
 
-# Legacy wake endpoint no longer opens the conversational microphone.
 @app.post("/api/wake-listen")
 def wake_listen_legacy():
     snapshot = session_controller.snapshot()
