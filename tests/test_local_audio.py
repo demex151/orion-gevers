@@ -20,9 +20,12 @@ class LocalAudioPlayerTests(unittest.TestCase):
 
         self.assertTrue(result["played"])
         self.assertEqual(result["backend"], "windows-mediaplayer")
-        self.assertEqual(calls[0][0][0].lower(), "powershell")
-        self.assertIn("PresentationCore", calls[0][0][5])
-        self.assertIn("gever response.mp3", calls[0][0][5])
+        args = calls[0][0]
+        self.assertEqual(args[0].lower(), "powershell")
+        self.assertIn("-Command", args)
+        command = args[args.index("-Command") + 1]
+        self.assertIn("PresentationCore", command)
+        self.assertIn("gever response.mp3", command)
 
     def test_non_windows_reports_unavailable(self):
         player = LocalAudioPlayer(platform_name="linux", runner=lambda *args, **kwargs: None)
