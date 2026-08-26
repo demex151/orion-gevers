@@ -14,6 +14,7 @@ from starlette.background import BackgroundTask
 
 from gever.brain import GeversBrain
 from gever.listen import GeversListener
+from gever.speech_director import GeversSpeechDirector
 from gever.voice import (
     GeversVoice,
     VOICE,
@@ -63,6 +64,8 @@ brain = GeversBrain()
 listener = GeversListener()
 
 voice_cleaner = GeversVoice()
+
+speech_director = GeversSpeechDirector()
 
 
 # =========================================================
@@ -212,8 +215,6 @@ def normalize_wake_text(text):
 
     normalized = str(text).lower()
 
-    # IMPORTANTE:
-    # orión -> orion
     normalized = remove_accents(
         normalized
     )
@@ -436,10 +437,14 @@ async def text_to_speech(
     request: SpeakRequest
 ):
 
+    directed_text = speech_director.direct(
+        request.text
+    )
+
     text = (
         voice_cleaner
         .clean_for_speech(
-            request.text
+            directed_text
         )
     )
 
@@ -452,7 +457,7 @@ async def text_to_speech(
         }
 
     print(
-        f"[TTS LIMPIO]: {text}"
+        f"[TTS DIRIGIDO]: {text}"
     )
 
     temp_file = (
