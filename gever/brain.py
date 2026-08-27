@@ -1,5 +1,6 @@
 import os
 import json
+import unicodedata
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -33,8 +34,23 @@ client = OpenAI(
 
 class GeversBrain:
 
+    LEAD_HUNTER_SIGNALS = (
+        "busca clientes",
+        "buscar clientes",
+        "busca oportunidades",
+        "buscar oportunidades",
+        "busca leads",
+        "buscar leads",
+        "clientes de pintura",
+        "oportunidades de clientes",
+        "find painting leads",
+        "find clients",
+        "find leads",
+    )
+
     def __init__(self):
         self.memory = GeversMemory()
+        self.lead_hunter = None
 
         self.messages = [
             {
@@ -42,6 +58,40 @@ class GeversBrain:
                 "content": SYSTEM_PROMPT
             }
         ]
+
+    @staticmethod
+    def _normalize_command(text):
+        normalized = unicodedata.normalize("NFKD", str(text or ""))
+        normalized = "".join(
+            char for char in normalized
+            if not unicodedata.combining(char)
+        )
+        return " ".join(normalized.lower().split())
+
+    def _is_lead_hunter_command(self, user_message):
+        normalized = self._normalize_command(user_message)
+        return any(signal in normalized for signal in self.LEAD_HUNTER_SIGNALS)
+
+    def _run_lead_hunter(self):
+        if self.lead_hunter is None:
+            from run_lead_hunter import build_hunter
+            self.lead_hunter, _ = build_hunter()
+
+        summary = self.lead_hunter.run(trigger="voice")
+
+        if summary.accepted_leads == 0:
+            return (
+                f"Búsqueda completada. Revisé {summary.raw_findings} resultados "
+                f"y no encontré ninguna oportunidad válida y reciente. "
+                f"Rechacé {summary.rejected_findings} resultados que no cumplían los filtros."
+            )
+
+        return (
+            f"Búsqueda completada. Encontré {summary.accepted_leads} oportunidades válidas "
+            f"de {summary.raw_findings} resultados revisados. "
+            f"HOT: {summary.hot_count}, WARM: {summary.warm_count}, "
+            f"PROSPECT: {summary.prospect_count}."
+        )
 
     def _clean_answer(self, answer):
         if not answer:
@@ -291,6 +341,12 @@ REGLAS:
         return False
 
     def think(self, user_message):
+        if self._is_lead_hunter_command(user_message):
+            try:
+                return self._run_lead_hunter()
+            except Exception as e:
+                return f"No pude ejecutar Lead Hunter: {e}"
+
         memory_context = self._memory_context()
 
         messages_for_model = [
