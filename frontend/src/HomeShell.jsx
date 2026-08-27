@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import App from "./App.jsx";
 import "./HomeShellFix.css";
-import { createBargeInController } from "./bargeInController.js";
-import { playSpeechWithBargeIn } from "./speechPlayback.js";
 
 const API="http://127.0.0.1:8000";
 const FIGMA_BG="https://www.figma.com/api/mcp/asset/35c2b6c1-77e1-4593-98b7-ac82a2b0d542";
@@ -39,13 +37,7 @@ export default function HomeShell(){
     const blob=await response.blob();
     const url=URL.createObjectURL(blob);
     const audio=new Audio(url);
-    const detector=createBargeInController();
-    try{
-      await playSpeechWithBargeIn({audio,detector,onPlaying:()=>setStatus("Hablando")});
-    }finally{
-      try{await detector.stop()}catch{}
-      URL.revokeObjectURL(url);
-    }
+    await new Promise((resolve,reject)=>{audio.onplaying=()=>setStatus("Hablando");audio.onended=()=>{URL.revokeObjectURL(url);resolve()};audio.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("No se pudo reproducir la voz"))};audio.play().catch(reject)});
   }
 
   async function sendCommand(){
