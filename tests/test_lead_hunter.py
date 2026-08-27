@@ -23,10 +23,17 @@ class BrokenProvider:
         raise RuntimeError("provider unavailable")
 
 
+class SingleQueryProfile:
+    business_name = "Gevers Painting"
+    locations = GeversLeadProfile().locations
+    services = GeversLeadProfile().services
+
+    def queries(self):
+        return ["one query"]
+
+
 def _profile():
-    profile = GeversLeadProfile()
-    profile.queries = lambda: ["one query"]
-    return profile
+    return SingleQueryProfile()
 
 
 def test_hunter_counts_accepts_rejects_and_persists(tmp_path):
