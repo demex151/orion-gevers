@@ -7,9 +7,11 @@ class FakeLeadHunter:
     def __init__(self, report):
         self.report = report
         self.calls = 0
+        self.progress_callbacks = []
 
-    def run(self, trigger="manual"):
+    def run(self, trigger="manual", progress_callback=None):
         self.calls += 1
+        self.progress_callbacks.append(progress_callback)
         return self.report
 
 
