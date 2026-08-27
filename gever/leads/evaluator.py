@@ -42,8 +42,19 @@ class LeadEvaluator:
     def _text(self, finding: SearchFinding) -> str:
         return self._normalize(" ".join(filter(None, (finding.title, finding.snippet, finding.location))))
 
+    def _location_aliases(self):
+        aliases = set()
+        for location in self.profile.locations:
+            normalized = self._normalize(location)
+            if normalized:
+                aliases.add(normalized)
+                city_or_county = normalized.split(",", 1)[0].strip()
+                if city_or_county:
+                    aliases.add(city_or_county)
+        return aliases
+
     def _in_service_area(self, text: str) -> bool:
-        return any(self._normalize(location) in text for location in self.profile.locations)
+        return any(alias in text for alias in self._location_aliases())
 
     def _painting_related(self, text: str) -> bool:
         terms = set(self._normalize(service) for service in self.profile.services)
@@ -76,8 +87,8 @@ class LeadEvaluator:
         urgent = self._urgent(text)
         opportunity_type = OpportunityType.ACTIVE_DEMAND if active_demand else OpportunityType.PROSPECT
 
-        score = 25.0  # verified local geography
-        score += 25.0  # supported painting service
+        score = 25.0
+        score += 25.0
         if active_demand:
             score += 25.0
         if urgent:
