@@ -1,26 +1,5 @@
 import App from "./App.jsx";
+import LeadHunterLivePanels from "./LeadHunterLivePanels.jsx";
 import "./HomeShellFix.css";
-
-const FIGMA_BG="https://www.figma.com/api/mcp/asset/35c2b6c1-77e1-4593-98b7-ac82a2b0d542";
-const FIGMA_BG_ALT="https://www.figma.com/api/mcp/asset/16911c84-b5b0-4d39-9f40-c04cafd4f426.png";
-const ORB_OUTER_1="https://www.figma.com/api/mcp/asset/9dac0c5f-cac6-4862-8608-dda298b68f8e.svg";
-const ORB_OUTER_2="https://www.figma.com/api/mcp/asset/81f89820-7336-4bb4-86c9-67175c45cf42.png";
-const ORB_MEDIUM="https://www.figma.com/api/mcp/asset/d2898649-77eb-40c3-bbc8-10b68d42a12f.svg";
-const ORB_AXIS="https://www.figma.com/api/mcp/asset/d0dc8d15-413b-4cbc-b0b5-1923e20cfd36.svg";
-const ORB_DOT="https://www.figma.com/api/mcp/asset/ecf73cad-bd21-4785-97c7-992d80799866.svg";
-const ORB_HALO_1="https://www.figma.com/api/mcp/asset/9533c683-6812-4be8-8b36-7c2cada52e3b.svg";
-const ORB_HALO_2="https://www.figma.com/api/mcp/asset/1765fa91-ce21-4925-b521-e5599c6eb1fe.svg";
-const ORB_GLOBE="https://www.figma.com/api/mcp/asset/bf57169a-646e-4f3b-aeb6-5de55842c272.png";
-const ORB_FLARE="https://www.figma.com/api/mcp/asset/1f7197f5-78a5-4ec6-833c-a5b853d84351.svg";
-
-export default function HomeShell(){
-  return <div className="gever-shell-root">
-    <div className="legacy-app legacy-hidden"><App/></div>
-    <div className="figma-home figma-ambient-home" data-node-id="2004:3">
-      <img className="figma-background" src={FIGMA_BG} onError={e=>{if(e.currentTarget.src!==FIGMA_BG_ALT)e.currentTarget.src=FIGMA_BG_ALT}} alt=""/>
-      <div className="figma-focus-ring"/>
-      <div className="figma-orb-visualizer"><div className="figma-orb-wrap"><img className="orb outer1" src={ORB_OUTER_1} alt=""/><img className="orb outer2" src={ORB_OUTER_2} alt=""/><img className="orb medium" src={ORB_MEDIUM} alt=""/><img className="orb axis" src={ORB_AXIS} alt=""/><img className="orb dot left" src={ORB_DOT} alt=""/><img className="orb dot right" src={ORB_DOT} alt=""/><img className="orb halo1" src={ORB_HALO_1} alt=""/><img className="orb halo2" src={ORB_HALO_2} alt=""/><img className="orb globe" src={ORB_GLOBE} alt=""/><img className="orb flare" src={ORB_FLARE} alt=""/><i className="tick top"/><i className="tick bottom"/></div></div>
-      <div className="gever-context-stage" aria-live="polite"/>
-    </div>
-  </div>
-}
+const FIGMA_BG="https://www.figma.com/api/mcp/asset/35c2b6c1-77e1-4593-98b7-ac82a2b0d542",FIGMA_BG_ALT="https://www.figma.com/api/mcp/asset/16911c84-b5b0-4d39-9f40-c04cafd4f426.png",ORB_OUTER_1="https://www.figma.com/api/mcp/asset/9dac0c5f-cac6-4862-8608-dda298b68f8e.svg",ORB_OUTER_2="https://www.figma.com/api/mcp/asset/81f89820-7336-4bb4-86c9-67175c45cf42.png",ORB_MEDIUM="https://www.figma.com/api/mcp/asset/d2898649-77eb-40c3-bbc8-10b68d42a12f.svg",ORB_AXIS="https://www.figma.com/api/mcp/asset/d0dc8d15-413b-4cbc-b0b5-1923e20cfd36.svg",ORB_DOT="https://www.figma.com/api/mcp/asset/ecf73cad-bd21-4785-97c7-992d80799866.svg",ORB_HALO_1="https://www.figma.com/api/mcp/asset/9533c683-6812-4be8-8b36-7c2cada52e3b.svg",ORB_HALO_2="https://www.figma.com/api/mcp/asset/1765fa91-ce21-4925-b521-e5599c6eb1fe.svg",ORB_GLOBE="https://www.figma.com/api/mcp/asset/bf57169a-646e-4f3b-aeb6-5de55842c272.png",ORB_FLARE="https://www.figma.com/api/mcp/asset/1f7197f5-78a5-4ec6-833c-a5b853d84351.svg";
+export default function HomeShell(){return <div className="gever-shell-root"><div className="legacy-app legacy-hidden"><App/></div><div className="figma-home figma-ambient-home"><img className="figma-background" src={FIGMA_BG} onError={e=>{if(e.currentTarget.src!==FIGMA_BG_ALT)e.currentTarget.src=FIGMA_BG_ALT}} alt=""/><div className="figma-focus-ring"/><div className="figma-orb-visualizer"><div className="figma-orb-wrap"><img className="orb outer1" src={ORB_OUTER_1} alt=""/><img className="orb outer2" src={ORB_OUTER_2} alt=""/><img className="orb medium" src={ORB_MEDIUM} alt=""/><img className="orb axis" src={ORB_AXIS} alt=""/><img className="orb dot left" src={ORB_DOT} alt=""/><img className="orb dot right" src={ORB_DOT} alt=""/><img className="orb halo1" src={ORB_HALO_1} alt=""/><img className="orb halo2" src={ORB_HALO_2} alt=""/><img className="orb globe" src={ORB_GLOBE} alt=""/><img className="orb flare" src={ORB_FLARE} alt=""/><i className="tick top"/><i className="tick bottom"/></div></div><div className="gever-context-stage" aria-live="polite"><LeadHunterLivePanels/></div></div></div>}
