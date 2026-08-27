@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import unicodedata
 
 from dotenv import load_dotenv
@@ -51,10 +52,18 @@ class GeversBrain:
             label=lead.name or lead.organization or f"Oportunidad {i}"; location=lead.location or "ubicación no identificada"; service=lead.service_requested_or_inferred or "pintura"; evidence=(lead.evidence or "").strip()
             details.append(f"{i}. {label}, {lead.classification.value}, score {lead.score:.0f}, {location}, servicio: {service}. {evidence}")
         return base+" Principales oportunidades: "+" ".join(details)
-    def _clean_answer(self,answer):
+    @staticmethod
+    def _clean_answer(answer):
         if not answer:return ""
-        if "</think>" in answer: answer=answer.split("</think>",1)[1].strip()
-        return answer.strip()
+        text=str(answer).strip()
+        text=re.sub(r"<think>.*?</think>","",text,flags=re.IGNORECASE|re.DOTALL).strip()
+        if "</think>" in text.lower(): text=re.split(r"</think>",text,flags=re.IGNORECASE,maxsplit=1)[-1].strip()
+        blocks=re.split(r"\n\s*\n",text)
+        if len(blocks)>1:
+            reasoning=re.compile(r"^(?:the user|user asked|we need|we should|we must|i need|i should|need to|the request|the task)\b",re.IGNORECASE)
+            while len(blocks)>1 and reasoning.search(blocks[0].strip()): blocks.pop(0)
+            text="\n\n".join(blocks).strip()
+        return text
     def _memory_context(self):
         memories=self.memory.get_context(limit=30); return f"MEMORIA PERMANENTE DE GEVER:\n\n{memories}\n\nREGLAS:\n- Usa estas memorias solo cuando sean relevantes.\n- No inventes recuerdos.\n- Si el usuario corrige información anterior, utiliza la versión más reciente.\n- Si una memoria fue eliminada, no la presentes como información conocida."
     def _analyze_memory_action(self,user_message):
