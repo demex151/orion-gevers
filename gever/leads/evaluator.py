@@ -31,14 +31,20 @@ class LeadEvaluator:
     )
     DIRECTORY_SIGNALS = (
         "top 5 painting", "top 10 painting", "best painting contractors",
-        "compare local painting contractors", "ratings and reviews", "customer reviews",
+        "compare local painting contractors", "compare expert painting contractors",
+        "ratings and reviews", "customer reviews", "read reviews",
         "bbb directory", "directory of", "your guide to trusted", "superpages.com",
+        "yellow pages", "find contact information",
     )
     PROVIDER_MARKETING_SIGNALS = (
         "our painting contractors", "our painters", "our painting professionals",
+        "professional painting contractors", "reliable, professional painting contractors",
         "we specialize in", "we proudly serve", "serves homeowners", "serving homeowners",
-        "get a free painting estimate", "get a free estimate today", "request your free quote",
-        "call us today", "call today", "our team", "our clientele",
+        "get a free painting estimate", "get a free estimate today", "get a free estimate",
+        "request your free quote", "request your free interior", "request your free exterior",
+        "free painting estimate", "free estimate on residential", "free estimate on commercial",
+        "schedule an appointment for your free", "book your free", "set up a free painting estimate",
+        "call us today", "call us at", "call today", "contact us today", "our team", "our clientele",
     )
 
     def __init__(self, profile: GeversLeadProfile | None = None):
@@ -121,8 +127,7 @@ class LeadEvaluator:
         urgent = self._urgent(text)
         opportunity_type = OpportunityType.ACTIVE_DEMAND if active_demand else OpportunityType.PROSPECT
 
-        score = 25.0
-        score += 25.0
+        score = 50.0
         if active_demand:
             score += 25.0
         if urgent:
