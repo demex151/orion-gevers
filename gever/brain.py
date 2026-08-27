@@ -58,12 +58,13 @@ class GeversBrain:
         text=str(answer).strip()
         text=re.sub(r"<think>.*?</think>","",text,flags=re.IGNORECASE|re.DOTALL).strip()
         if "</think>" in text.lower(): text=re.split(r"</think>",text,flags=re.IGNORECASE,maxsplit=1)[-1].strip()
+        lines=text.splitlines()
+        reasoning=re.compile(r"^(?:okay[,.: -]*\s*)?(?:the user|user asked|we need|we should|we must|i need|i should|let me|looking at|need to|the request|the task)\b",re.IGNORECASE)
+        while lines and (not lines[0].strip() or reasoning.search(lines[0].strip())): lines.pop(0)
+        text="\n".join(lines).strip()
         blocks=re.split(r"\n\s*\n",text)
-        if len(blocks)>1:
-            reasoning=re.compile(r"^(?:the user|user asked|we need|we should|we must|i need|i should|need to|the request|the task)\b",re.IGNORECASE)
-            while len(blocks)>1 and reasoning.search(blocks[0].strip()): blocks.pop(0)
-            text="\n\n".join(blocks).strip()
-        return text
+        while len(blocks)>1 and reasoning.search(blocks[0].strip()): blocks.pop(0)
+        return "\n\n".join(blocks).strip()
     def _memory_context(self):
         memories=self.memory.get_context(limit=30); return f"MEMORIA PERMANENTE DE GEVER:\n\n{memories}\n\nREGLAS:\n- Usa estas memorias solo cuando sean relevantes.\n- No inventes recuerdos.\n- Si el usuario corrige información anterior, utiliza la versión más reciente.\n- Si una memoria fue eliminada, no la presentes como información conocida."
     def _analyze_memory_action(self,user_message):
