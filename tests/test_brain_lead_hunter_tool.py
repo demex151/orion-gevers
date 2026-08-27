@@ -22,7 +22,7 @@ class FakeMemory:
     def remember(self, *args, **kwargs):
         return None
 
-    def context_for(self, *args, **kwargs):
+    def get_context(self, *args, **kwargs):
         return ""
 
 
