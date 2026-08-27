@@ -29,12 +29,10 @@ def test_explicit_local_urgent_demand_becomes_hot_active_demand():
     assert lead.score >= 75
 
 
-def test_local_painting_prospect_without_request_is_not_hot():
-    finding = SearchFinding(url="https://example.com/property/55", title="Myrtle Beach property renovation", snippet="Commercial property in Myrtle Beach with exterior painting and drywall renovation planned.")
-    lead = evaluator().evaluate(finding).candidate
-    assert lead is not None
-    assert lead.opportunity_type is OpportunityType.PROSPECT
-    assert lead.classification is not LeadClassification.HOT
+def test_local_painting_content_without_buyer_intent_is_rejected():
+    result = evaluator().evaluate(SearchFinding(url="https://example.com/property/55", title="Myrtle Beach property renovation", snippet="Commercial property in Myrtle Beach with exterior painting and drywall renovation planned."))
+    assert result.candidate is None
+    assert result.rejection_reason == "no_buyer_intent"
 
 
 def test_rejects_competing_painting_company_marketing_page():
@@ -75,15 +73,33 @@ def test_rejects_real_directory_yellow_pages():
     assert result.candidate is None
 
 
+def test_rejects_recommendation_of_existing_painter_as_not_new_demand():
+    result = evaluator().evaluate(SearchFinding(url="https://www.facebook.com/groups/lorissouthcarolina/posts/2466238837107843", title="Loris South Carolina", snippet="Contact John Larrimore with E&J Custom Painting, very reasonable and professional. I highly recommend giving Coastal Myrtle Beach Handymen a call first. They do amazing work and offer free estimates."))
+    assert result.candidate is None
+    assert result.rejection_reason == "no_buyer_intent"
+
+
+def test_rejects_contractor_looking_for_work():
+    result = evaluator().evaluate(SearchFinding(url="https://www.facebook.com/groups/northmyrtlebeachsc/permalink/2342159202867125", title="Myrtle Beach contractor question", snippet="Where do homeowners in Myrtle Beach find a new contractor? I own Carolina Painting Pros LLC. I'm licensed and insured and looking for new work."))
+    assert result.candidate is None
+    assert result.rejection_reason == "provider_self_promotion"
+
+
 def test_accepts_real_person_looking_for_painter():
     result = evaluator().evaluate(SearchFinding(url="https://www.facebook.com/groups/murrellsinlet/posts/2240309023077096", title="North Myrtle Beach", snippet="Looking for painter Gregg in North Myrtle Beach. Hello guys I am looking for a painter."))
     assert result.candidate is not None
     assert result.candidate.opportunity_type is OpportunityType.ACTIVE_DEMAND
 
 
+def test_accepts_person_asking_for_painter_recommendations():
+    result = evaluator().evaluate(SearchFinding(url="https://example.com/community/88", title="North Myrtle Beach recommendations", snippet="Can anyone recommend a reliable painter in North Myrtle Beach for my living room?"))
+    assert result.candidate is not None
+    assert result.candidate.opportunity_type is OpportunityType.ACTIVE_DEMAND
+
+
 def test_dedupe_key_is_deterministic_for_same_finding():
-    first = SearchFinding(url="https://EXAMPLE.com/post/7/", title="Painter needed Myrtle Beach", snippet="Need exterior painting estimate in Myrtle Beach")
-    second = SearchFinding(url="https://example.com/post/7", title="Painter needed Myrtle Beach", snippet="Need exterior painting estimate in Myrtle Beach")
+    first = SearchFinding(url="https://EXAMPLE.com/post/7/", title="Painter needed Myrtle Beach", snippet="Need exterior painting estimate for my house in Myrtle Beach")
+    second = SearchFinding(url="https://example.com/post/7", title="Painter needed Myrtle Beach", snippet="Need exterior painting estimate for my house in Myrtle Beach")
     first_lead = evaluator().evaluate(first).candidate
     second_lead = evaluator().evaluate(second).candidate
     assert first_lead is not None and second_lead is not None
