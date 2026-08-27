@@ -38,8 +38,13 @@ test("requires sustained activity and fires only once", async () => {
   const analyser = {
     fftSize: 0,
     getByteTimeDomainData(data) {
-      data.fill(128);
-      if (sample === "voice") data[0] = 255;
+      if (sample === "voice") {
+        for (let i = 0; i < data.length; i += 1) {
+          data[i] = i % 2 === 0 ? 200 : 56;
+        }
+      } else {
+        data.fill(128);
+      }
     },
     disconnect: () => {},
   };
