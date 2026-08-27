@@ -15,11 +15,17 @@ def rejection_bucket(reason):
 
 class LeadHunterTelemetry:
     def __init__(self):
-        self._lock=RLock(); self._snapshot=self._idle()
+        self._lock=RLock(); self._display_request=0; self._snapshot=self._idle()
 
-    @staticmethod
-    def _idle():
-        return {"state":"idle","run_id":None,"active_stage":None,"found":0,"analyzed":0,"rejected":0,"valid":0,"duplicates":0,"saved":0,"rejections":{"competition":0,"directories":0,"advertising":0,"contractors":0,"stale":0,"other":0},"classifications":{"HOT":0,"WARM":0,"PROSPECT":0},"query":None,"provider":None,"last_evidence":None,"updated_at":time(),"error":None}
+    def _idle(self):
+        return {"state":"idle","run_id":None,"active_stage":None,"found":0,"analyzed":0,"rejected":0,"valid":0,"duplicates":0,"saved":0,"rejections":{"competition":0,"directories":0,"advertising":0,"contractors":0,"stale":0,"other":0},"classifications":{"HOT":0,"WARM":0,"PROSPECT":0},"query":None,"provider":None,"last_evidence":None,"updated_at":time(),"error":None,"display_request":self._display_request}
+
+    def request_results_display(self):
+        with self._lock:
+            self._display_request += 1
+            self._snapshot["display_request"] = self._display_request
+            self._snapshot["updated_at"] = time()
+            return self._display_request
 
     def publish(self,event):
         with self._lock:
@@ -35,11 +41,12 @@ class LeadHunterTelemetry:
             elif kind=="duplicate":
                 self._snapshot.update(active_stage="dedupe",duplicates=event.get("duplicates",self._snapshot["duplicates"]+1))
             elif kind=="accepted":
-                self._snapshot.update(active_stage="classify",valid=event.get("accepted",self._snapshot["valid"]+1)); c=event.get("classification");
+                self._snapshot.update(active_stage="classify",valid=event.get("accepted",self._snapshot["valid"]+1)); c=event.get("classification")
                 if c in self._snapshot["classifications"]: self._snapshot["classifications"][c]+=1
             elif kind=="saved": self._snapshot.update(active_stage="save",saved=event.get("saved",self._snapshot["saved"]+1))
             elif kind=="error": self._snapshot.update(error=event.get("error"))
             elif kind=="completed": self._snapshot.update(state="completed",active_stage="complete",found=event.get("found",self._snapshot["found"]),rejected=event.get("rejected",self._snapshot["rejected"]),valid=event.get("accepted",self._snapshot["valid"]),duplicates=event.get("duplicates",self._snapshot["duplicates"])); self._snapshot["classifications"]={"HOT":event.get("hot",0),"WARM":event.get("warm",0),"PROSPECT":event.get("prospect",0)}
+            self._snapshot["display_request"]=self._display_request
             self._snapshot["updated_at"]=time()
 
     def snapshot(self):
