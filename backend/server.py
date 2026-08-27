@@ -15,7 +15,7 @@ from gever.voice import GeversVoice,VOICE,VOICE_RATE,VOICE_PITCH,VOICE_VOLUME
 from gever.leads.telemetry import lead_hunter_telemetry
 
 WAKE_WORD="orion"
-app=FastAPI(title="GEVER Backend",version="1.10.0")
+app=FastAPI(title="GEVER Backend",version="1.11.0")
 app.add_middleware(CORSMiddleware,allow_origins=["http://localhost:5173","http://localhost:5174","http://127.0.0.1:5173","http://127.0.0.1:5174"],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
 brain=GeversBrain(); listener=GeversListener(); voice_cleaner=GeversVoice(); microphone_lock=threading.Lock(); tts_counter_lock=threading.Lock(); tts_request_counter=0
 
@@ -25,11 +25,17 @@ def next_tts_request_id():
 class ChatRequest(BaseModel): message:str
 class SpeakRequest(BaseModel): text:str
 @app.get("/")
-def root(): return {"name":"GEVER","status":"online","version":"1.10.0","wake_word":"ORION"}
+def root(): return {"name":"GEVER","status":"online","version":"1.11.0","wake_word":"ORION"}
 @app.get("/api/status")
 def status(): return {"status":"online","brain":"ready","memory":"connected","microphone":"ready","voice":"ready","wake_word":"ORION","voice_model":VOICE,"voice_rate":VOICE_RATE,"voice_pitch":VOICE_PITCH}
 @app.get("/api/lead-hunter/progress")
 def lead_hunter_progress(): return {"ok":True,"progress":lead_hunter_telemetry.snapshot()}
+@app.get("/api/lead-hunter/results")
+def lead_hunter_results():
+ try:
+  brain._ensure_lead_tools(); run=brain.lead_store.latest_run(); leads=brain.lead_store.list_leads()
+  return {"ok":True,"run":run,"leads":[{"name":x.name,"organization":x.organization,"classification":x.classification.value,"score":x.score,"location":x.location,"service":x.service_requested_or_inferred,"evidence":x.evidence,"source_url":x.source_url} for x in leads[:5]]}
+ except Exception as e:return {"ok":False,"error":str(e)}
 @app.get("/api/memories")
 def memories():
  try:return {"ok":True,"memories":brain.memories()}
