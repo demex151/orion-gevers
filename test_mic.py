@@ -1,10 +1,14 @@
 from gever.listen import GeversListener
 
 
-listener = GeversListener()
+def main():
+    listener = GeversListener()
+    text = listener.listen()
 
-text = listener.listen()
+    print()
+    print("GEVER escuchó:")
+    print(text)
 
-print()
-print("GEVER escuchó:")
-print(text)
+
+if __name__ == "__main__":
+    main()

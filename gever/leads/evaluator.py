@@ -19,10 +19,27 @@ class LeadEvaluator:
         "need painter", "need a painter", "looking for painter", "looking for a painter",
         "recommend painter", "recommend a painter", "painter recommendation",
         "painting quote", "painting estimate", "quote for painting", "estimate for painting",
-        "painting contractor", "hire painter", "hire a painter", "painter needed",
+        "hire painter", "hire a painter", "painter needed",
     )
     URGENCY_SIGNALS = ("asap", "urgent", "today", "this week", "immediately", "right away")
     CONTACT_SIGNALS = ("call", "text", "email", "message", "reply", "contact")
+
+    EMPLOYMENT_SIGNALS = (
+        "painter job", "painter jobs", "painting job opening", "job opening",
+        "per hour", "hourly pay", "salary", "hiring painter", "now hiring",
+        "employment", "apply now", "according to experience",
+    )
+    DIRECTORY_SIGNALS = (
+        "top 5 painting", "top 10 painting", "best painting contractors",
+        "compare local painting contractors", "ratings and reviews", "customer reviews",
+        "bbb directory", "directory of", "your guide to trusted", "superpages.com",
+    )
+    PROVIDER_MARKETING_SIGNALS = (
+        "our painting contractors", "our painters", "our painting professionals",
+        "we specialize in", "we proudly serve", "serves homeowners", "serving homeowners",
+        "get a free painting estimate", "get a free estimate today", "request your free quote",
+        "call us today", "call today", "our team", "our clientele",
+    )
 
     def __init__(self, profile: GeversLeadProfile | None = None):
         self.profile = profile or GeversLeadProfile()
@@ -61,11 +78,24 @@ class LeadEvaluator:
         terms.update(("paint", "painting", "painter", "drywall"))
         return any(term in text for term in terms)
 
+    @staticmethod
+    def _has_any(text: str, signals) -> bool:
+        return any(signal in text for signal in signals)
+
+    def _rejection_reason_for_non_customer(self, text: str) -> str | None:
+        if self._has_any(text, self.EMPLOYMENT_SIGNALS):
+            return "employment_listing"
+        if self._has_any(text, self.DIRECTORY_SIGNALS):
+            return "directory_or_listicle"
+        if self._has_any(text, self.PROVIDER_MARKETING_SIGNALS):
+            return "provider_marketing"
+        return None
+
     def _active_demand(self, text: str) -> bool:
-        return any(signal in text for signal in self.DEMAND_SIGNALS)
+        return self._has_any(text, self.DEMAND_SIGNALS)
 
     def _urgent(self, text: str) -> bool:
-        return any(signal in text for signal in self.URGENCY_SIGNALS)
+        return self._has_any(text, self.URGENCY_SIGNALS)
 
     def _dedupe_key(self, finding: SearchFinding) -> str:
         canonical = self._canonical_url(finding.url)
@@ -83,6 +113,10 @@ class LeadEvaluator:
         if not self._painting_related(text):
             return EvaluationResult(rejection_reason="unsupported_service")
 
+        non_customer_reason = self._rejection_reason_for_non_customer(text)
+        if non_customer_reason:
+            return EvaluationResult(rejection_reason=non_customer_reason)
+
         active_demand = self._active_demand(text)
         urgent = self._urgent(text)
         opportunity_type = OpportunityType.ACTIVE_DEMAND if active_demand else OpportunityType.PROSPECT
@@ -93,7 +127,7 @@ class LeadEvaluator:
             score += 25.0
         if urgent:
             score += 15.0
-        if finding.public_contact_method or any(signal in text for signal in self.CONTACT_SIGNALS):
+        if finding.public_contact_method or self._has_any(text, self.CONTACT_SIGNALS):
             score += 10.0
         score = min(100.0, score)
 
