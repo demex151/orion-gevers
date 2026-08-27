@@ -73,6 +73,12 @@ def test_rejects_real_directory_yellow_pages():
     assert result.candidate is None
 
 
+def test_rejects_rhetorical_provider_marketing_question():
+    result = evaluator().evaluate(SearchFinding(url="https://www.aptera.com/painters/sc/horry-county.php", title="Painters in Horry County", snippet="Need painters in Horry County to spruce up the appearance of your house or office building? Do you have old paint flaking off or a boring color from a previous owner?"))
+    assert result.candidate is None
+    assert result.rejection_reason == "provider_marketing"
+
+
 def test_rejects_recommendation_of_existing_painter_as_not_new_demand():
     result = evaluator().evaluate(SearchFinding(url="https://www.facebook.com/groups/lorissouthcarolina/posts/2466238837107843", title="Loris South Carolina", snippet="Contact John Larrimore with E&J Custom Painting, very reasonable and professional. I highly recommend giving Coastal Myrtle Beach Handymen a call first. They do amazing work and offer free estimates."))
     assert result.candidate is None
