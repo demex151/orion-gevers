@@ -50,6 +50,11 @@ class LeadEvaluator:
         "schedule an appointment for your free", "book your free", "set up a free painting estimate",
         "call us today", "call us at", "call today", "contact us today", "our team", "our clientele",
     )
+    RHETORICAL_PROVIDER_MARKETING_SIGNALS = (
+        "need painters in", "need a painter for your", "need painters for your",
+        "do you have old paint", "spruce up the appearance of your house",
+        "spruce up the appearance of your office", "your house or office building",
+    )
     PROVIDER_SELF_PROMOTION_SIGNALS = (
         "i own ", "my painting company", "my painting business", "our painting company",
         "i'm licensed and insured", "i am licensed and insured", "looking for new work",
@@ -122,6 +127,8 @@ class LeadEvaluator:
         if self._has_any(text, self.DIRECTORY_SIGNALS):
             return "directory_or_listicle"
         if self._has_any(text, self.PROVIDER_MARKETING_SIGNALS):
+            return "provider_marketing"
+        if self._has_any(text, self.RHETORICAL_PROVIDER_MARKETING_SIGNALS):
             return "provider_marketing"
         if self._has_any(text, self.PROVIDER_SELF_PROMOTION_SIGNALS):
             return "provider_self_promotion"
