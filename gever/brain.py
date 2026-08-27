@@ -17,6 +17,7 @@ client=OpenAI(base_url=BASE_URL,api_key=API_KEY)
 class GeversBrain:
     LEAD_HUNTER_SIGNALS=("busca clientes","buscar clientes","busca oportunidades","buscar oportunidades","busca leads","buscar leads","clientes de pintura","oportunidades de clientes","find painting leads","find clients","find leads")
     LEAD_RESULTS_SIGNALS=("resumen de lo que encontraste","que encontraste","qué encontraste","resultados de la busqueda","resultados de la búsqueda","muestrame los clientes","muéstrame los clientes","clientes que encontraste","leads que encontraste","cuales son los hot","cuáles son los hot","resumen de clientes")
+    LEAD_GRAPH_SIGNALS=("muestrame las graficas","muéstrame las gráficas","muestra las graficas","muestra las gráficas","ver las graficas","ver las gráficas","graficas de lo que encontraste","gráficas de lo que encontraste","graficos de lo que encontraste","gráficos de lo que encontraste")
     def __init__(self):
         self.memory=GeversMemory(); self.lead_hunter=None; self.lead_store=None; self.messages=[{"role":"system","content":SYSTEM_PROMPT}]
     @staticmethod
@@ -24,6 +25,7 @@ class GeversBrain:
         normalized=unicodedata.normalize("NFKD",str(text or "")); normalized="".join(c for c in normalized if not unicodedata.combining(c)); return " ".join(normalized.lower().split())
     def _is_lead_hunter_command(self,user_message): return any(s in self._normalize_command(user_message) for s in self.LEAD_HUNTER_SIGNALS)
     def _is_lead_results_command(self,user_message): return any(self._normalize_command(s) in self._normalize_command(user_message) for s in self.LEAD_RESULTS_SIGNALS)
+    def _is_lead_graph_command(self,user_message): return any(self._normalize_command(s) in self._normalize_command(user_message) for s in self.LEAD_GRAPH_SIGNALS)
     def _ensure_lead_tools(self):
         if self.lead_hunter is None or self.lead_store is None:
             from run_lead_hunter import build_hunter
@@ -36,9 +38,12 @@ class GeversBrain:
         summary=self.lead_hunter.run(trigger="voice",progress_callback=lead_hunter_telemetry.publish)
         if summary.accepted_leads==0: return f"Búsqueda completada. Revisé {summary.raw_findings} resultados y no encontré ninguna oportunidad válida y reciente. Rechacé {summary.rejected_findings} resultados que no cumplían los filtros."
         return f"Búsqueda completada. Encontré {summary.accepted_leads} oportunidades válidas de {summary.raw_findings} resultados revisados. HOT: {summary.hot_count}, WARM: {summary.warm_count}, PROSPECT: {summary.prospect_count}."
-    def _lead_results(self):
+    def _lead_results(self,show_graphs=False):
         self._ensure_lead_tools(); run=self.lead_store.latest_run(); leads=self.lead_store.list_leads()
         if not run: return "Todavía no tengo una búsqueda de clientes completada para resumir."
+        if show_graphs:
+            from gever.leads.telemetry import lead_hunter_telemetry
+            lead_hunter_telemetry.request_results_display()
         base=f"En la última búsqueda revisé {run['raw_findings']} resultados. Encontré {run['accepted_leads']} oportunidades válidas y descarté {run['rejected_findings']}. HOT: {run['hot_count']}, WARM: {run['warm_count']}, PROSPECT: {run['prospect_count']}."
         if not leads: return base+" No hay oportunidades guardadas actualmente."
         details=[]
@@ -66,6 +71,7 @@ class GeversBrain:
             elif kind=="DELETE" and action.get("id"): self.memory.delete(action["id"])
         except Exception: pass
     def think(self,user_message):
+        if self._is_lead_graph_command(user_message): return self._lead_results(show_graphs=True)
         if self._is_lead_results_command(user_message): return self._lead_results()
         if self._is_lead_hunter_command(user_message): return self._run_lead_hunter()
         memory_context=self._memory_context(); action=self._analyze_memory_action(user_message); self._apply_memory_action(action)
