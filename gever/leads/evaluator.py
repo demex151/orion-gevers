@@ -2,6 +2,7 @@ import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import date, datetime
 from urllib.parse import urlsplit, urlunsplit
 
 from .models import LeadCandidate, LeadClassification, OpportunityType
@@ -15,6 +16,8 @@ class EvaluationResult:
 
 
 class LeadEvaluator:
+    MAX_LEAD_AGE_DAYS = 30
+
     DEMAND_SIGNALS = (
         "need painter", "need a painter", "looking for painter", "looking for a painter",
         "recommend painter", "recommend a painter", "recommend a reliable painter",
@@ -56,6 +59,21 @@ class LeadEvaluator:
         "i highly recommend giving", "i recommend giving", "highly recommend giving",
         "contact john", "does amazing work", "they do amazing work",
     )
+
+    MONTHS = {
+        "jan": 1, "january": 1,
+        "feb": 2, "february": 2,
+        "mar": 3, "march": 3,
+        "apr": 4, "april": 4,
+        "may": 5,
+        "jun": 6, "june": 6,
+        "jul": 7, "july": 7,
+        "aug": 8, "august": 8,
+        "sep": 9, "sept": 9, "september": 9,
+        "oct": 10, "october": 10,
+        "nov": 11, "november": 11,
+        "dec": 12, "december": 12,
+    }
 
     def __init__(self, profile: GeversLeadProfile | None = None):
         self.profile = profile or GeversLeadProfile()
@@ -123,6 +141,49 @@ class LeadEvaluator:
         raw = f"{canonical}|{identity}".encode("utf-8")
         return hashlib.sha256(raw).hexdigest()
 
+    def _lead_age_days(self, finding: SearchFinding) -> int | None:
+        raw = " ".join(filter(None, (finding.published_at, finding.title, finding.snippet)))
+        text = self._normalize(raw)
+
+        if any(token in text for token in ("today", "just now", "minutes ago", "hours ago")):
+            return 0
+        if "yesterday" in text:
+            return 1
+
+        relative = re.search(r"\b(\d{1,3})\s+days?\s+ago\b", text)
+        if relative:
+            return int(relative.group(1))
+
+        iso = re.search(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b", text)
+        if iso:
+            try:
+                published = date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+                return max(0, (date.today() - published).days)
+            except ValueError:
+                pass
+
+        absolute = re.search(
+            r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2}),\s*(20\d{2})\b",
+            text,
+        )
+        if absolute:
+            month = self.MONTHS.get(absolute.group(1))
+            if month:
+                try:
+                    published = date(int(absolute.group(3)), month, int(absolute.group(2)))
+                    return max(0, (date.today() - published).days)
+                except ValueError:
+                    pass
+
+        if finding.published_at:
+            try:
+                published = datetime.fromisoformat(finding.published_at.replace("Z", "+00:00")).date()
+                return max(0, (date.today() - published).days)
+            except ValueError:
+                pass
+
+        return None
+
     def evaluate(self, finding: SearchFinding) -> EvaluationResult:
         if not finding.url or not (finding.title or finding.snippet):
             return EvaluationResult(rejection_reason="insufficient_evidence")
@@ -141,6 +202,10 @@ class LeadEvaluator:
         if not active_demand:
             return EvaluationResult(rejection_reason="no_buyer_intent")
 
+        age_days = self._lead_age_days(finding)
+        if age_days is not None and age_days > self.MAX_LEAD_AGE_DAYS:
+            return EvaluationResult(rejection_reason="stale_lead")
+
         urgent = self._urgent(text)
         score = 75.0
         if urgent:
@@ -149,7 +214,6 @@ class LeadEvaluator:
             score += 10.0
         score = min(100.0, score)
 
-        classification = LeadClassification.HOT
         missing = []
         if not finding.name:
             missing.append("name")
@@ -158,7 +222,7 @@ class LeadEvaluator:
 
         evidence = finding.snippet or finding.title
         return EvaluationResult(candidate=LeadCandidate(
-            classification=classification,
+            classification=LeadClassification.HOT,
             urgent=urgent,
             score=score,
             opportunity_type=OpportunityType.ACTIVE_DEMAND,
@@ -175,5 +239,5 @@ class LeadEvaluator:
             public_contact_method=finding.public_contact_method,
             missing_information=missing,
             recommended_action="Review evidence and contact manually",
-            validation_notes="Local Gevers Painting V2 buyer-intent evaluation",
+            validation_notes="Local Gevers Painting V2 buyer-intent + freshness evaluation",
         ))
