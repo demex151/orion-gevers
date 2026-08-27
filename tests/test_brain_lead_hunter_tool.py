@@ -34,6 +34,7 @@ def make_brain(hunter):
     brain.memory = FakeMemory()
     brain.messages = [{"role": "system", "content": "test"}]
     brain.lead_hunter = hunter
+    brain.lead_store = SimpleNamespace()
     return brain
 
 
