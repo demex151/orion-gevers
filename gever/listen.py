@@ -133,8 +133,8 @@ class GeversListener:
 
     def listen(
         self,
-        timeout=None,
-        phrase_time_limit=None
+        timeout=8,
+        phrase_time_limit=15
     ):
 
         try:
