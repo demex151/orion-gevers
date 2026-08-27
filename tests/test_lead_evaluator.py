@@ -97,6 +97,34 @@ def test_accepts_person_asking_for_painter_recommendations():
     assert result.candidate.opportunity_type is OpportunityType.ACTIVE_DEMAND
 
 
+def test_rejects_stale_2024_buyer_request():
+    result = evaluator().evaluate(SearchFinding(url="https://facebook.com/groups/old/post1", title="Horry County painter recommendations", snippet="Sep 3, 2024 · Any painter recommendations? Need interior doors sprayed in Horry County."))
+    assert result.candidate is None
+    assert result.rejection_reason == "stale_lead"
+
+
+def test_rejects_stale_2023_buyer_request():
+    result = evaluator().evaluate(SearchFinding(url="https://facebook.com/groups/old/post2", title="Horry County painter recommendations", snippet="Aug 16, 2023 · Licensed and insured painter recommendations needed in Horry County."))
+    assert result.candidate is None
+    assert result.rejection_reason == "stale_lead"
+
+
+def test_rejects_stale_2025_buyer_request():
+    result = evaluator().evaluate(SearchFinding(url="https://facebook.com/groups/old/post3", title="Myrtle Beach painter recommendations", snippet="Aug 7, 2025 · Licensed and insured painter recommendations needed in Myrtle Beach."))
+    assert result.candidate is None
+    assert result.rejection_reason == "stale_lead"
+
+
+def test_accepts_relative_two_days_ago_request():
+    result = evaluator().evaluate(SearchFinding(url="https://facebook.com/groups/recent/post1", title="Myrtle Beach painter recommendations", snippet="2 days ago · Shore Drive condo interior painter recommendations in Myrtle Beach."))
+    assert result.candidate is not None
+
+
+def test_accepts_relative_five_days_ago_request():
+    result = evaluator().evaluate(SearchFinding(url="https://facebook.com/groups/recent/post2", title="Horry County painter recommendations", snippet="5 days ago · House painter recommendations for interior painting in Horry County."))
+    assert result.candidate is not None
+
+
 def test_dedupe_key_is_deterministic_for_same_finding():
     first = SearchFinding(url="https://EXAMPLE.com/post/7/", title="Painter needed Myrtle Beach", snippet="Need exterior painting estimate for my house in Myrtle Beach")
     second = SearchFinding(url="https://example.com/post/7", title="Painter needed Myrtle Beach", snippet="Need exterior painting estimate for my house in Myrtle Beach")
