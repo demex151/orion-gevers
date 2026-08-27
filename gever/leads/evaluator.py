@@ -17,7 +17,8 @@ class EvaluationResult:
 class LeadEvaluator:
     DEMAND_SIGNALS = (
         "need painter", "need a painter", "looking for painter", "looking for a painter",
-        "recommend painter", "recommend a painter", "painter recommendation",
+        "recommend painter", "recommend a painter", "recommend a reliable painter",
+        "recommendation for a painter", "painter recommendation", "painter recommendations",
         "painting quote", "painting estimate", "quote for painting", "estimate for painting",
         "hire painter", "hire a painter", "painter needed",
     )
@@ -45,6 +46,15 @@ class LeadEvaluator:
         "free painting estimate", "free estimate on residential", "free estimate on commercial",
         "schedule an appointment for your free", "book your free", "set up a free painting estimate",
         "call us today", "call us at", "call today", "contact us today", "our team", "our clientele",
+    )
+    PROVIDER_SELF_PROMOTION_SIGNALS = (
+        "i own ", "my painting company", "my painting business", "our painting company",
+        "i'm licensed and insured", "i am licensed and insured", "looking for new work",
+        "looking for work", "available for painting work", "we are licensed and insured",
+    )
+    EXISTING_PROVIDER_RECOMMENDATION_SIGNALS = (
+        "i highly recommend giving", "i recommend giving", "highly recommend giving",
+        "contact john", "does amazing work", "they do amazing work",
     )
 
     def __init__(self, profile: GeversLeadProfile | None = None):
@@ -95,6 +105,10 @@ class LeadEvaluator:
             return "directory_or_listicle"
         if self._has_any(text, self.PROVIDER_MARKETING_SIGNALS):
             return "provider_marketing"
+        if self._has_any(text, self.PROVIDER_SELF_PROMOTION_SIGNALS):
+            return "provider_self_promotion"
+        if self._has_any(text, self.EXISTING_PROVIDER_RECOMMENDATION_SIGNALS):
+            return "no_buyer_intent"
         return None
 
     def _active_demand(self, text: str) -> bool:
@@ -124,25 +138,18 @@ class LeadEvaluator:
             return EvaluationResult(rejection_reason=non_customer_reason)
 
         active_demand = self._active_demand(text)
-        urgent = self._urgent(text)
-        opportunity_type = OpportunityType.ACTIVE_DEMAND if active_demand else OpportunityType.PROSPECT
+        if not active_demand:
+            return EvaluationResult(rejection_reason="no_buyer_intent")
 
-        score = 50.0
-        if active_demand:
-            score += 25.0
+        urgent = self._urgent(text)
+        score = 75.0
         if urgent:
             score += 15.0
         if finding.public_contact_method or self._has_any(text, self.CONTACT_SIGNALS):
             score += 10.0
         score = min(100.0, score)
 
-        if active_demand and score >= 75:
-            classification = LeadClassification.HOT
-        elif score >= 50:
-            classification = LeadClassification.WARM
-        else:
-            classification = LeadClassification.PROSPECT
-
+        classification = LeadClassification.HOT
         missing = []
         if not finding.name:
             missing.append("name")
@@ -154,7 +161,7 @@ class LeadEvaluator:
             classification=classification,
             urgent=urgent,
             score=score,
-            opportunity_type=opportunity_type,
+            opportunity_type=OpportunityType.ACTIVE_DEMAND,
             source_url=self._canonical_url(finding.url),
             source_domain=finding.domain,
             evidence=evidence,
@@ -167,6 +174,6 @@ class LeadEvaluator:
             published_at=finding.published_at,
             public_contact_method=finding.public_contact_method,
             missing_information=missing,
-            recommended_action="Review evidence and contact manually" if active_demand else "Review as local painting prospect",
-            validation_notes="Local Gevers Painting V1 deterministic evaluation",
+            recommended_action="Review evidence and contact manually",
+            validation_notes="Local Gevers Painting V2 buyer-intent evaluation",
         ))
