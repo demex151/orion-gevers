@@ -8,7 +8,7 @@ class FakeLeadHunter:
         self.report = report
         self.calls = 0
 
-    def run_once(self):
+    def run(self, trigger="manual"):
         self.calls += 1
         return self.report
 
@@ -30,12 +30,13 @@ def make_brain(hunter):
     brain = GeversBrain.__new__(GeversBrain)
     brain.llm = FailingLLM()
     brain.memory = FakeMemory()
+    brain.messages = [{"role": "system", "content": "test"}]
     brain.lead_hunter = hunter
     return brain
 
 
 def test_spanish_search_clients_command_executes_lead_hunter():
-    report = SimpleNamespace(found=21, accepted=0, rejected=21, hot=0, warm=0, prospect=0, errors=[])
+    report = SimpleNamespace(raw_findings=21, accepted_leads=0, rejected_findings=21, hot_count=0, warm_count=0, prospect_count=0, errors={})
     hunter = FakeLeadHunter(report)
     brain = make_brain(hunter)
 
@@ -47,7 +48,7 @@ def test_spanish_search_clients_command_executes_lead_hunter():
 
 
 def test_spanish_find_leads_command_executes_lead_hunter_and_reports_results():
-    report = SimpleNamespace(found=12, accepted=2, rejected=10, hot=2, warm=0, prospect=0, errors=[])
+    report = SimpleNamespace(raw_findings=12, accepted_leads=2, rejected_findings=10, hot_count=2, warm_count=0, prospect_count=0, errors={})
     hunter = FakeLeadHunter(report)
     brain = make_brain(hunter)
 
