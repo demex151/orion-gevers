@@ -40,7 +40,7 @@ def lead_hunter_results():
  except Exception as e:return {"ok":False,"error":str(e)}
 @app.get("/api/memories")
 def memories():
- try:return {"ok":True,"memories":brain.memories()}
+ try:return {"ok":True,"memories":brain.memory.get_all()}
  except Exception as e:return {"ok":False,"error":str(e)}
 @app.post("/api/chat")
 def chat(request:ChatRequest):

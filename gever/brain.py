@@ -109,9 +109,9 @@ class GeversBrain:
     def _apply_memory_action(self,action):
         kind=str(action.get("action","NONE")).upper()
         try:
-            if kind=="CREATE" and action.get("content"): self.memory.add(action["content"],action.get("category","general"))
-            elif kind=="UPDATE" and action.get("id") and action.get("content"): self.memory.update(action["id"],action["content"],action.get("category","general"))
-            elif kind=="DELETE" and action.get("id"): self.memory.delete(action["id"])
+            if kind=="CREATE" and action.get("content"): self.memory.remember(action["content"],action.get("category","general"))
+            elif kind=="UPDATE" and action.get("id") and action.get("content"): self.memory.update_by_id(action["id"],action["content"],action.get("category","general"))
+            elif kind=="DELETE" and action.get("id"): self.memory.forget_by_id(action["id"])
         except Exception: pass
     def think(self,user_message):
         if self._is_lead_graph_command(user_message): return self._lead_results(show_graphs=True)
