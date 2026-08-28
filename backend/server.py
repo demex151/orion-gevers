@@ -13,11 +13,13 @@ from gever.brain import GeversBrain
 from gever.listen import GeversListener
 from gever.voice import GeversVoice,VOICE,VOICE_RATE,VOICE_PITCH,VOICE_VOLUME
 from gever.leads.telemetry import lead_hunter_telemetry
+from gever.tasks.api import create_task_router
 
 WAKE_WORD="orion"
 app=FastAPI(title="GEVER Backend",version="1.11.0")
 app.add_middleware(CORSMiddleware,allow_origins=["http://localhost:5173","http://localhost:5174","http://127.0.0.1:5173","http://127.0.0.1:5174"],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
 brain=GeversBrain(); listener=GeversListener(); voice_cleaner=GeversVoice(); microphone_lock=threading.Lock(); tts_counter_lock=threading.Lock(); tts_request_counter=0
+app.include_router(create_task_router(brain.task_runtime))
 
 def next_tts_request_id():
  global tts_request_counter

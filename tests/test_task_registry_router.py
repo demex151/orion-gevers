@@ -32,3 +32,22 @@ def test_matching_is_accent_and_case_insensitive():
         name="accent"; signals=("búsqueda rápida",)
     registry=TaskRegistry(); capability=AccentCapability(); registry.register(capability)
     assert registry.resolve("BUSQUEDA RAPIDA") is capability
+
+
+def test_overlapping_signals_follow_registration_priority():
+    class Other(FakeCapability):
+        name = "other"
+    registry = TaskRegistry()
+    first = Other()
+    registry.register(first)
+    registry.register(FakeCapability())
+    assert registry.resolve("haz tarea") is first
+    assert registry.get("missing") is None
+
+
+def test_empty_signal_does_not_capture_conversation():
+    class Empty(FakeCapability):
+        signals = ("  ",)
+    registry = TaskRegistry()
+    registry.register(Empty())
+    assert registry.resolve("hola") is None

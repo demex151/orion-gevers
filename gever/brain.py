@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from gever.identity import SYSTEM_PROMPT
 from gever.memory import GeversMemory
+from gever.tasks.registry import TaskRegistry
+from gever.tasks.router import TaskRouter
+from gever.tasks.runtime import TaskRuntime
+from gever.tasks.capabilities.lead_hunter import LeadHunterCapability
 
 load_dotenv()
 MODEL=os.getenv("NVIDIA_MODEL"); BASE_URL=os.getenv("NVIDIA_BASE_URL"); API_KEY=os.getenv("NVIDIA_API_KEY")
@@ -16,11 +20,31 @@ if not BASE_URL: raise RuntimeError("No se encontró NVIDIA_BASE_URL en .env")
 client=OpenAI(base_url=BASE_URL,api_key=API_KEY)
 
 class GeversBrain:
-    LEAD_HUNTER_SIGNALS=("busca clientes","buscar clientes","busca oportunidades","buscar oportunidades","busca leads","buscar leads","clientes de pintura","oportunidades de clientes","find painting leads","find clients","find leads")
+    LEAD_HUNTER_SIGNALS=LeadHunterCapability.signals
     LEAD_RESULTS_SIGNALS=("resumen de lo que encontraste","que encontraste","qué encontraste","resultados de la busqueda","resultados de la búsqueda","muestrame los clientes","muéstrame los clientes","clientes que encontraste","leads que encontraste","cuales son los hot","cuáles son los hot","resumen de clientes")
     LEAD_GRAPH_SIGNALS=("muestrame las graficas","muéstrame las gráficas","muestra las graficas","muestra las gráficas","ver las graficas","ver las gráficas","graficas de lo que encontraste","gráficas de lo que encontraste","graficos de lo que encontraste","gráficos de lo que encontraste")
     def __init__(self):
         self.memory=GeversMemory(); self.lead_hunter=None; self.lead_store=None; self.messages=[{"role":"system","content":SYSTEM_PROMPT}]
+        self._ensure_task_runtime()
+    def _ensure_task_runtime(self):
+        # Also supports existing callers that construct the brain via __new__.
+        if not hasattr(self, "task_runtime"):
+            self.task_registry = TaskRegistry()
+            self.task_registry.register(LeadHunterCapability(self._get_lead_tools))
+            self.task_router = TaskRouter(self.task_registry)
+            self.task_runtime = TaskRuntime()
+    def _get_lead_tools(self):
+        self._ensure_lead_tools()
+        return self.lead_hunter, self.lead_store
+    def _run_task(self, capability, context):
+        outcome = self.task_runtime.run(capability, context)
+        if not outcome.verified:
+            return "No pude completar y verificar la tarea. Los resultados pueden estar incompletos; revisa el estado de la búsqueda antes de volver a intentarlo."
+        try:
+            return capability.format_response(outcome.result)
+        except Exception:
+            # Execution already succeeded; do not retry a potentially side-effecting task.
+            return "La tarea terminó y fue verificada, pero no pude preparar el resumen."
     @staticmethod
     def _normalize_command(text):
         normalized=unicodedata.normalize("NFKD",str(text or "")); normalized="".join(c for c in normalized if not unicodedata.combining(c)); return " ".join(normalized.lower().split())
@@ -46,11 +70,8 @@ class GeversBrain:
             if self.lead_hunter is None: self.lead_hunter=hunter
             if self.lead_store is None: self.lead_store=store
     def _run_lead_hunter(self):
-        self._ensure_lead_tools()
-        from gever.leads.telemetry import lead_hunter_telemetry
-        summary=self.lead_hunter.run(trigger="voice",progress_callback=lead_hunter_telemetry.publish)
-        if summary.accepted_leads==0: return f"Búsqueda completada. Revisé {summary.raw_findings} resultados y no encontré ninguna oportunidad válida y reciente. Rechacé {summary.rejected_findings} resultados que no cumplían los filtros."
-        return f"Búsqueda completada. Encontré {summary.accepted_leads} oportunidades válidas de {summary.raw_findings} resultados revisados. HOT: {summary.hot_count}, WARM: {summary.warm_count}, PROSPECT: {summary.prospect_count}."
+        self._ensure_task_runtime()
+        return self._run_task(self.task_registry.get("lead_hunter"), {})
     def _lead_results(self,show_graphs=False):
         self._ensure_lead_tools(); run=self.lead_store.latest_run(); leads=self.lead_store.list_leads()
         if not run: return "Todavía no tengo una búsqueda de clientes completada para resumir."
@@ -95,7 +116,9 @@ class GeversBrain:
     def think(self,user_message):
         if self._is_lead_graph_command(user_message): return self._lead_results(show_graphs=True)
         if self._is_lead_results_command(user_message): return self._lead_results()
-        if self._is_lead_hunter_command(user_message): return self._run_lead_hunter()
+        self._ensure_task_runtime()
+        capability = self.task_router.route(user_message)
+        if capability is not None: return self._run_task(capability, {"text": user_message})
         memory_context=self._memory_context(); action=self._analyze_memory_action(user_message); self._apply_memory_action(action)
         language_directive=self._language_directive(user_message)
         messages=[self.messages[0],{"role":"system","content":language_directive},{"role":"system","content":memory_context},*self.messages[1:],{"role":"user","content":user_message}]
