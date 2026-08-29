@@ -5,6 +5,6 @@ export function telemetryPanels(p){
  return [
   {id:'lead-pipeline',title:'GEVER · LEAD HUNTER',kind:'pipeline',items:PIPELINE.map(([id,label])=>({id,label,active:p.active_stage===id,value:id==='competition'?r.competition:id==='directories'?r.directories:id==='advertising'?r.advertising:id==='contractors'?r.contractors:id==='stale'?r.stale:null}))},
   {id:'lead-counters',title:'ANÁLISIS EN TIEMPO REAL',kind:'metrics',metrics:[['Encontrados',p.found],['Analizados',p.analyzed],['Descartados',p.rejected],['Válidos',p.valid],['Duplicados',p.duplicates],['Guardados',p.saved]]},
-  {id:'lead-results',title:p.state==='completed'?'RESULTADO FINAL':'OPORTUNIDADES',kind:'results',metrics:[['HOT',c.HOT||0],['WARM',c.WARM||0],['PROSPECT',c.PROSPECT||0]]}
+  {id:'lead-results',title:p.state==='completed'?'RESULTADO FINAL':p.state==='failed'?'BÚSQUEDA FALLIDA':'OPORTUNIDADES',kind:'results',metrics:[['HOT',c.HOT||0],['WARM',c.WARM||0],['PROSPECT',c.PROSPECT||0]]}
  ];
 }

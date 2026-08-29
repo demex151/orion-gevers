@@ -9,7 +9,7 @@ class Store:
     def start_run(self, trigger): return SimpleNamespace(run_id="run-1",raw_findings=0,rejected_findings=0,duplicate_merges=0,accepted_leads=0,hot_count=0,warm_count=0,prospect_count=0,errors={})
     def record_rejection(self,*args,**kwargs): pass
     def upsert_lead(self,candidate): self.saved.append(candidate)
-    def finish_run(self,summary): pass
+    def finish_run(self,summary,status="completed"): self.last_status=status
     def _connect(self):
         class C:
             def __enter__(self): return self

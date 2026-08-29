@@ -68,8 +68,19 @@ class LeadHunter:
 
                         self.store.upsert_lead(candidate)
                         self._emit(progress_callback, "saved", run_id=summary.run_id, saved=summary.accepted_leads, source_url=finding.url)
-        finally:
-            self.store.finish_run(summary)
-            self._emit(progress_callback, "completed", run_id=summary.run_id, found=summary.raw_findings, rejected=summary.rejected_findings, accepted=summary.accepted_leads, duplicates=summary.duplicate_merges, hot=summary.hot_count, warm=summary.warm_count, prospect=summary.prospect_count, errors=dict(summary.errors))
+        except Exception as exc:
+            # A genuine failure (not a per-provider search error, which is
+            # already caught above) must not be reported as "completed":
+            # the old telemetry state drives the frontend's decision to
+            # refresh results, and a failed run's partial counts are not a
+            # trustworthy result.
+            self.store.finish_run(summary, status="failed")
+            self._emit(progress_callback, "failed", run_id=summary.run_id, error=f"{type(exc).__name__}: {exc}",
+                       found=summary.raw_findings, rejected=summary.rejected_findings, accepted=summary.accepted_leads,
+                       duplicates=summary.duplicate_merges, hot=summary.hot_count, warm=summary.warm_count,
+                       prospect=summary.prospect_count)
+            raise
 
+        self.store.finish_run(summary, status="completed")
+        self._emit(progress_callback, "completed", run_id=summary.run_id, found=summary.raw_findings, rejected=summary.rejected_findings, accepted=summary.accepted_leads, duplicates=summary.duplicate_merges, hot=summary.hot_count, warm=summary.warm_count, prospect=summary.prospect_count, errors=dict(summary.errors))
         return summary

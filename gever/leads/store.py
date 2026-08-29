@@ -37,10 +37,14 @@ class LeadStore:
                 first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS lead_evidence (id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id TEXT NOT NULL REFERENCES leads(lead_id) ON DELETE CASCADE, source_url TEXT NOT NULL, evidence TEXT NOT NULL, seen_at TEXT NOT NULL, UNIQUE(lead_id, source_url, evidence));
-            CREATE TABLE IF NOT EXISTS search_runs (run_id TEXT PRIMARY KEY, trigger TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT, raw_findings INTEGER NOT NULL DEFAULT 0, accepted_leads INTEGER NOT NULL DEFAULT 0, rejected_findings INTEGER NOT NULL DEFAULT 0, duplicate_merges INTEGER NOT NULL DEFAULT 0, hot_count INTEGER NOT NULL DEFAULT 0, warm_count INTEGER NOT NULL DEFAULT 0, prospect_count INTEGER NOT NULL DEFAULT 0, errors TEXT NOT NULL DEFAULT '{}');
+            CREATE TABLE IF NOT EXISTS search_runs (run_id TEXT PRIMARY KEY, trigger TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT, status TEXT NOT NULL DEFAULT 'completed', raw_findings INTEGER NOT NULL DEFAULT 0, accepted_leads INTEGER NOT NULL DEFAULT 0, rejected_findings INTEGER NOT NULL DEFAULT 0, duplicate_merges INTEGER NOT NULL DEFAULT 0, hot_count INTEGER NOT NULL DEFAULT 0, warm_count INTEGER NOT NULL DEFAULT 0, prospect_count INTEGER NOT NULL DEFAULT 0, errors TEXT NOT NULL DEFAULT '{}');
             CREATE TABLE IF NOT EXISTS rejected_findings (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, source_url TEXT, evidence TEXT, reason TEXT NOT NULL, rejected_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS lead_status_history (id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id TEXT NOT NULL REFERENCES leads(lead_id) ON DELETE CASCADE, old_status TEXT, new_status TEXT NOT NULL, changed_at TEXT NOT NULL);
             """)
+            # Migration for databases created before the status column existed.
+            existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(search_runs)")}
+            if "status" not in existing_columns:
+                conn.execute("ALTER TABLE search_runs ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'")
 
     def upsert_lead(self, candidate: LeadCandidate):
         now = _now()
@@ -71,6 +75,14 @@ class LeadStore:
             return [self._record_from_row(conn, row) for row in rows]
 
     def latest_run(self):
+        # Only a run that finished successfully should be reported as "the
+        # latest search" to the user; a failed run stays recorded for
+        # auditing but must not be presented as if it completed normally.
+        with self._connect() as conn:
+            row=conn.execute("SELECT * FROM search_runs WHERE ended_at IS NOT NULL AND status='completed' ORDER BY ended_at DESC, started_at DESC LIMIT 1").fetchone()
+            return dict(row) if row else None
+
+    def latest_run_including_failed(self):
         with self._connect() as conn:
             row=conn.execute("SELECT * FROM search_runs WHERE ended_at IS NOT NULL ORDER BY ended_at DESC, started_at DESC LIMIT 1").fetchone()
             return dict(row) if row else None
@@ -88,9 +100,9 @@ class LeadStore:
         with self._connect() as conn: conn.execute("INSERT INTO search_runs(run_id, trigger, started_at) VALUES(?,?,?)", (summary.run_id, trigger, summary.started_at))
         return summary
 
-    def finish_run(self, summary: SearchRunSummary):
+    def finish_run(self, summary: SearchRunSummary, status: str = "completed"):
         summary.ended_at = summary.ended_at or _now()
-        with self._connect() as conn: conn.execute("UPDATE search_runs SET ended_at=?, raw_findings=?, accepted_leads=?, rejected_findings=?, duplicate_merges=?, hot_count=?, warm_count=?, prospect_count=?, errors=? WHERE run_id=?", (summary.ended_at, summary.raw_findings, summary.accepted_leads, summary.rejected_findings, summary.duplicate_merges, summary.hot_count, summary.warm_count, summary.prospect_count, json.dumps(summary.errors, ensure_ascii=False), summary.run_id))
+        with self._connect() as conn: conn.execute("UPDATE search_runs SET ended_at=?, status=?, raw_findings=?, accepted_leads=?, rejected_findings=?, duplicate_merges=?, hot_count=?, warm_count=?, prospect_count=?, errors=? WHERE run_id=?", (summary.ended_at, status, summary.raw_findings, summary.accepted_leads, summary.rejected_findings, summary.duplicate_merges, summary.hot_count, summary.warm_count, summary.prospect_count, json.dumps(summary.errors, ensure_ascii=False), summary.run_id))
         return summary
 
     def record_rejection(self, run_id, reason, source_url=None, evidence=None):

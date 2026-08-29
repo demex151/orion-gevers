@@ -46,6 +46,7 @@ class LeadHunterTelemetry:
             elif kind=="saved": self._snapshot.update(active_stage="save",saved=event.get("saved",self._snapshot["saved"]+1))
             elif kind=="error": self._snapshot.update(error=event.get("error"))
             elif kind=="completed": self._snapshot.update(state="completed",active_stage="complete",found=event.get("found",self._snapshot["found"]),rejected=event.get("rejected",self._snapshot["rejected"]),valid=event.get("accepted",self._snapshot["valid"]),duplicates=event.get("duplicates",self._snapshot["duplicates"])); self._snapshot["classifications"]={"HOT":event.get("hot",0),"WARM":event.get("warm",0),"PROSPECT":event.get("prospect",0)}
+            elif kind=="failed": self._snapshot.update(state="failed",active_stage="failed",error=event.get("error"),found=event.get("found",self._snapshot["found"]),rejected=event.get("rejected",self._snapshot["rejected"]),valid=event.get("accepted",self._snapshot["valid"]),duplicates=event.get("duplicates",self._snapshot["duplicates"])); self._snapshot["classifications"]={"HOT":event.get("hot",0),"WARM":event.get("warm",0),"PROSPECT":event.get("prospect",0)}
             self._snapshot["display_request"]=self._display_request
             self._snapshot["updated_at"]=time()
 
