@@ -2,7 +2,10 @@ from gever.brain import GeversBrain
 
 
 def make_brain():
+    import threading
     brain = GeversBrain.__new__(GeversBrain)
+    brain._messages_lock = threading.Lock()
+    brain._lead_tools_lock = threading.Lock()
     return brain
 
 

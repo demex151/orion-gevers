@@ -19,10 +19,15 @@ class LeadStore:
         self._initialize()
 
     def _connect(self):
-        conn = sqlite3.connect(self.db_path)
+        # busy_timeout makes a writer wait (instead of raising
+        # "database is locked" immediately) when another connection holds
+        # the write lock, which matters once more than one request can hit
+        # this store at the same time (see AUDITORIA-2026-08-28.md, Etapa 5).
+        conn = sqlite3.connect(self.db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 10000")
         return conn
 
     def _initialize(self):

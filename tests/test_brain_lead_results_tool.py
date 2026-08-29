@@ -14,7 +14,10 @@ class FakeMemory:
     def get_context(self,*a,**k): return ""
 
 def make_brain():
-    brain=GeversBrain.__new__(GeversBrain); brain.llm=FailingLLM(); brain.memory=FakeMemory(); brain.messages=[{"role":"system","content":"test"}]; brain.lead_hunter=None; brain.lead_store=FakeStore(); return brain
+    import threading
+    brain=GeversBrain.__new__(GeversBrain); brain.llm=FailingLLM(); brain.memory=FakeMemory(); brain.messages=[{"role":"system","content":"test"}]; brain.lead_hunter=None; brain.lead_store=FakeStore()
+    brain._messages_lock=threading.Lock(); brain._lead_tools_lock=threading.Lock()
+    return brain
 
 def test_summary_followup_reads_stored_results_without_new_search():
     brain=make_brain(); response=brain.think("dame un resumen de lo que encontraste en la búsqueda de clientes")

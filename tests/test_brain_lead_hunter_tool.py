@@ -29,12 +29,15 @@ class FakeMemory:
 
 
 def make_brain(hunter):
+    import threading
     brain = GeversBrain.__new__(GeversBrain)
     brain.llm = FailingLLM()
     brain.memory = FakeMemory()
     brain.messages = [{"role": "system", "content": "test"}]
     brain.lead_hunter = hunter
     brain.lead_store = SimpleNamespace()
+    brain._messages_lock = threading.Lock()
+    brain._lead_tools_lock = threading.Lock()
     return brain
 
 

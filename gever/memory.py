@@ -1,4 +1,5 @@
 import json
+import threading
 from pathlib import Path
 from datetime import datetime
 
@@ -21,6 +22,11 @@ class GeversMemory:
         self.data_dir.mkdir(exist_ok=True)
 
         self.memory_file = self.data_dir / "memory.json"
+        # FastAPI runs sync routes in a thread pool, so two /api/chat
+        # requests can call these methods from different threads at the
+        # same time; without this lock, a read-modify-write on
+        # self.memories / memory.json can interleave and lose a write.
+        self._lock = threading.Lock()
         self.memories = self._load()
 
         self._ensure_ids()
@@ -112,30 +118,31 @@ class GeversMemory:
 
         normalized = content.casefold()
 
-        for memory in self.memories:
-            existing = memory.get(
-                "content",
-                ""
-            ).strip().casefold()
+        with self._lock:
+            for memory in self.memories:
+                existing = memory.get(
+                    "content",
+                    ""
+                ).strip().casefold()
 
-            if existing == normalized:
-                return False
+                if existing == normalized:
+                    return False
 
-        memory = {
-            "id": self._next_id(),
-            "content": content,
-            "category": category,
-            "source": source,
-            "created_at": datetime.now().isoformat(
-                timespec="seconds"
-            ),
-            "updated_at": None
-        }
+            memory = {
+                "id": self._next_id(),
+                "content": content,
+                "category": category,
+                "source": source,
+                "created_at": datetime.now().isoformat(
+                    timespec="seconds"
+                ),
+                "updated_at": None
+            }
 
-        self.memories.append(memory)
-        self._save()
+            self.memories.append(memory)
+            self._save()
 
-        return True
+            return True
 
     def update_by_id(
         self,
@@ -149,24 +156,25 @@ class GeversMemory:
         if not memory_id or not new_content:
             return False
 
-        for memory in self.memories:
-            if memory.get("id") == memory_id:
-                memory["content"] = new_content
+        with self._lock:
+            for memory in self.memories:
+                if memory.get("id") == memory_id:
+                    memory["content"] = new_content
 
-                if category:
-                    category = category.strip().lower()
+                    if category:
+                        category = category.strip().lower()
 
-                    if category in ALLOWED_CATEGORIES:
-                        memory["category"] = category
+                        if category in ALLOWED_CATEGORIES:
+                            memory["category"] = category
 
-                memory["updated_at"] = datetime.now().isoformat(
-                    timespec="seconds"
-                )
+                    memory["updated_at"] = datetime.now().isoformat(
+                        timespec="seconds"
+                    )
 
-                self._save()
-                return True
+                    self._save()
+                    return True
 
-        return False
+            return False
 
     def forget_by_id(self, memory_id):
         memory_id = memory_id.strip()
@@ -174,22 +182,24 @@ class GeversMemory:
         if not memory_id:
             return False
 
-        original_count = len(self.memories)
+        with self._lock:
+            original_count = len(self.memories)
 
-        self.memories = [
-            memory
-            for memory in self.memories
-            if memory.get("id") != memory_id
-        ]
+            self.memories = [
+                memory
+                for memory in self.memories
+                if memory.get("id") != memory_id
+            ]
 
-        if len(self.memories) == original_count:
-            return False
+            if len(self.memories) == original_count:
+                return False
 
-        self._save()
-        return True
+            self._save()
+            return True
 
     def get_all(self):
-        return self.memories.copy()
+        with self._lock:
+            return self.memories.copy()
 
     def get_context(self, limit=30):
         if not self.memories:
@@ -210,5 +220,6 @@ class GeversMemory:
         return "\n".join(lines)
 
     def forget_all(self):
-        self.memories = []
-        self._save()
+        with self._lock:
+            self.memories = []
+            self._save()

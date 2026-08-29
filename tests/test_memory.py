@@ -1,3 +1,5 @@
+import threading
+
 from gever.memory import GeversMemory
 
 
@@ -9,6 +11,7 @@ def make_memory(tmp_path):
     memory.data_dir = tmp_path / "data"
     memory.data_dir.mkdir(exist_ok=True)
     memory.memory_file = memory.data_dir / "memory.json"
+    memory._lock = threading.Lock()
     memory.memories = memory._load()
     memory._ensure_ids()
     return memory
@@ -47,6 +50,41 @@ def test_forget_by_id_removes_only_that_memory(tmp_path):
     assert len(remaining) == 1
     assert remaining[0]["content"] == "Recuerdo dos"
     assert memory.forget_by_id(first_id) is False
+
+
+def test_concurrent_remember_and_forget_do_not_lose_a_write(tmp_path):
+    """Regression guard for Etapa 5. FastAPI runs sync routes in a thread
+    pool, so /api/chat and a memory action can run on different threads
+    at the same time. forget_by_id() rebuilds self.memories as a new
+    filtered list from a snapshot; without a lock, a remember() that
+    appends to the old list object while that snapshot is being built
+    gets silently discarded the moment forget_by_id() reassigns
+    self.memories. This is verified to actually happen without the lock
+    (confirmed by hand before adding the lock in gever/memory.py)."""
+    import threading
+    import time
+
+    memory = make_memory(tmp_path)
+    memory.remember("Para borrar", category="fact")
+    target_id = memory.get_all()[0]["id"]
+
+    def do_forget():
+        memory.forget_by_id(target_id)
+
+    def do_remember():
+        time.sleep(0.01)  # let forget_by_id start first
+        memory.remember("Nuevo mientras se borra otro", category="fact")
+
+    forgetter = threading.Thread(target=do_forget)
+    rememberer = threading.Thread(target=do_remember)
+    forgetter.start()
+    rememberer.start()
+    forgetter.join()
+    rememberer.join()
+
+    contents = [m["content"] for m in memory.get_all()]
+    assert "Nuevo mientras se borra otro" in contents
+    assert "Para borrar" not in contents
 
 
 def test_memory_has_no_add_update_delete_methods(tmp_path):
