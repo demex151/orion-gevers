@@ -29,6 +29,33 @@ def test_explicit_local_urgent_demand_becomes_hot_active_demand():
     assert lead.score >= 75
 
 
+def test_urgent_and_reachable_demand_is_hot_but_urgent_alone_is_warm():
+    """HOT requires both an urgency signal and a way to reach the poster;
+    a single signal alone is only WARM. Before this fix, every accepted
+    finding was HOT unconditionally regardless of these signals."""
+    finding = SearchFinding(url="https://example.com/posts/200", title="Need painter ASAP in Myrtle Beach", snippet="Need a painting quote today for my house in Myrtle Beach.")
+    lead = evaluator().evaluate(finding).candidate
+    assert lead is not None
+    assert lead.urgent is True
+    assert lead.classification is LeadClassification.WARM
+
+
+def test_contact_method_alone_without_urgency_is_warm():
+    finding = SearchFinding(url="https://example.com/posts/201", title="Looking for a painter in Myrtle Beach", snippet="Can anyone recommend a reliable painter in Myrtle Beach for my kitchen?", public_contact_method="public reply")
+    lead = evaluator().evaluate(finding).candidate
+    assert lead is not None
+    assert lead.urgent is False
+    assert lead.classification is LeadClassification.WARM
+
+
+def test_neither_urgent_nor_reachable_is_prospect_not_hot():
+    finding = SearchFinding(url="https://www.facebook.com/groups/murrellsinlet/posts/2240309023077099", title="North Myrtle Beach", snippet="Looking for painter Gregg in North Myrtle Beach. Hello guys I am looking for a painter.")
+    lead = evaluator().evaluate(finding).candidate
+    assert lead is not None
+    assert lead.urgent is False
+    assert lead.classification is LeadClassification.PROSPECT
+
+
 def test_local_painting_content_without_buyer_intent_is_rejected():
     result = evaluator().evaluate(SearchFinding(url="https://example.com/property/55", title="Myrtle Beach property renovation", snippet="Commercial property in Myrtle Beach with exterior painting and drywall renovation planned."))
     assert result.candidate is None

@@ -214,12 +214,26 @@ class LeadEvaluator:
             return EvaluationResult(rejection_reason="stale_lead")
 
         urgent = self._urgent(text)
+        has_contact = bool(finding.public_contact_method) or self._has_any(text, self.CONTACT_SIGNALS)
         score = 75.0
         if urgent:
             score += 15.0
-        if finding.public_contact_method or self._has_any(text, self.CONTACT_SIGNALS):
+        if has_contact:
             score += 10.0
         score = min(100.0, score)
+
+        # First-cut tiering, not yet validated against real Gevers Painting
+        # examples (see AUDITORIA-2026-08-28.md, Etapa 4): HOT requires both
+        # an explicit urgency signal and a way to actually reach the poster;
+        # WARM has exactly one of those two signals; PROSPECT is a
+        # qualified lead with neither. Every accepted finding used to be
+        # classified HOT unconditionally, which made the label meaningless.
+        if urgent and has_contact:
+            classification = LeadClassification.HOT
+        elif urgent or has_contact:
+            classification = LeadClassification.WARM
+        else:
+            classification = LeadClassification.PROSPECT
 
         missing = []
         if not finding.name:
@@ -229,7 +243,7 @@ class LeadEvaluator:
 
         evidence = finding.snippet or finding.title
         return EvaluationResult(candidate=LeadCandidate(
-            classification=LeadClassification.HOT,
+            classification=classification,
             urgent=urgent,
             score=score,
             opportunity_type=OpportunityType.ACTIVE_DEMAND,
