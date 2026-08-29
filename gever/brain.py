@@ -47,6 +47,9 @@ class GeversBrain:
         if not answer:
             return ""
 
+        if "<think>" in answer and "</think>" not in answer:
+            return ""
+
         if "</think>" in answer:
             answer = answer.split("</think>", 1)[1].strip()
 
@@ -81,7 +84,8 @@ REGLAS:
             for memory in existing_memories
         ]
 
-        memory_prompt = f"""
+        memory_prompt = f"""detailed thinking off
+
 Eres el administrador de memoria de GEVER.
 
 Decide qué hacer con el mensaje del usuario.
@@ -296,6 +300,10 @@ REGLAS:
         messages_for_model = [
             {
                 "role": "system",
+                "content": "detailed thinking off"
+            },
+            {
+                "role": "system",
                 "content": SYSTEM_PROMPT
             },
             {
@@ -331,6 +339,12 @@ REGLAS:
 
             answer = response.choices[0].message.content or ""
             answer = self._clean_answer(answer)
+
+            if not answer:
+                answer = (
+                    "Se me cortó el razonamiento antes de terminar "
+                    "la respuesta. ¿Podés repetir la pregunta?"
+                )
 
             self.messages.append(
                 {
