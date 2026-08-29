@@ -1,14 +1,17 @@
 .env
-__pycache__/
-.venv/
-.env
 .env.*
 __pycache__/
+*.pyc
 .venv/
 venv/
 node_modules/
 dist/
 .vite/
-*.pyc
 *.log
+
+# Datos locales del negocio: memoria persistente y base de leads. No deben
+# terminar en el historial de git (ver AUDITORIA-2026-08-28.md, Etapa 6).
 data/memory.json
+data/leads.db
+data/leads.db-wal
+data/leads.db-shm

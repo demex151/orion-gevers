@@ -1,0 +1,32 @@
+Copyright (c) 2026 Jose (demex151). Todos los derechos reservados.
+
+Este software y su codigo fuente son propiedad privada. No se concede
+ningun permiso de uso, copia, modificacion, fusion, publicacion,
+distribucion, sublicencia ni venta de este software o de copias de el,
+salvo autorizacion explicita y por escrito del propietario.
+
+Nota: este archivo fija una postura de "todos los derechos reservados"
+por defecto -- es decir, cierra el codigo en lugar de abrirlo -- porque
+el repositorio no tenia ningun archivo de licencia y el objetivo
+declarado del proyecto es eventualmente comercializarlo. Esto NO es
+asesoria legal. Antes de comercializar GEVER, conviene:
+
+  1. Confirmar con un abogado si "todos los derechos reservados" es la
+     forma correcta de proteger el proyecto, o si conviene una licencia
+     comercial mas especifica.
+  2. Revisar los terminos de servicio de NVIDIA (API de inferencia),
+     Microsoft Edge TTS, y cualquier proveedor de busqueda web utilizado,
+     ya que sus terminos de uso pueden imponer restricciones adicionales
+     independientes de esta licencia.
+  3. Revisar la licencia de cada dependencia de terceros listada en
+     requirements.txt y frontend/package.json (la mayoria de paquetes
+     Python y JavaScript de uso comun son MIT/BSD/Apache-2.0, pero esto
+     no se ha verificado paquete por paquete en esta auditoria).
+  4. Confirmar que ninguna porcion sustancial de codigo de terceros
+     (por ejemplo, de jarvis-demo, licenciado MIT) fue copiada
+     textualmente; si en el futuro se copia codigo de un proyecto de
+     terceros, hay que conservar su aviso de licencia junto con ese
+     codigo, independientemente de lo que diga este archivo.
+
+Ver AUDITORIA-2026-08-28.md (seccion "Sin manifiesto de dependencias
+del backend ni archivo de licencia propio") para el contexto completo.

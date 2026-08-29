@@ -1,0 +1,29 @@
+# Dependencias del backend de GEVER (orion-gevers).
+#
+# Generado a partir de las importaciones reales del codigo el 2026-08-28
+# (ver AUDITORIA-2026-08-28.md, Etapa 6) -- antes de este archivo, el
+# proyecto no tenia un manifiesto de dependencias del backend, solo
+# requirements-lead-hunter.txt (que cubre unicamente el paquete ddgs).
+#
+# No se pudo generar con `pip freeze` en esta sesion: el entorno de
+# auditoria (una VM Linux aislada sin salida a internet) no tenia estos
+# paquetes instalados y no pudo instalarlos. Antes de confiar en las
+# versiones exactas, corre `pip freeze > requirements-freeze.txt` en tu
+# Windows con el entorno que ya usas (Python 3.13) y ajusta este archivo
+# para que coincida.
+
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+openai
+edge-tts
+SpeechRecognition
+pygame
+ddgs==9.15.0
+
+# Solo lo usa gever_app.py, una interfaz de escritorio con Tkinter que
+# parece independiente de la interfaz web (React) en frontend/. Confirma
+# si gever_app.py sigue en uso real antes de comercializar; si no, este
+# archivo y la dependencia se pueden retirar.
+customtkinter
