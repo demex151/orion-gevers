@@ -1,8 +1,11 @@
+import { normalizeCoreState } from "./coreState.js";
+
 export const GEVER_VISUAL_EVENT = "gever:visual-state";
 
 export function buildVisualState({ status = "", subtitles = [], conversation = [] } = {}) {
   return {
     status: String(status || ""),
+    coreState: normalizeCoreState(status),
     subtitles: Array.isArray(subtitles) ? [...subtitles] : [],
     conversation: Array.isArray(conversation) ? [...conversation] : [],
   };
