@@ -9,6 +9,7 @@ test("visual bridge preserves voice state without controlling audio", () => {
     conversation: [{ sender: "GEVER", text: "Hola" }],
   });
   assert.equal(state.status, "HABLANDO");
+  assert.equal(state.coreState, "speaking");
   assert.deepEqual(state.subtitles, ["Soy GEVER", "y estoy respondiendo."]);
   assert.equal(state.conversation[0].sender, "GEVER");
 });
