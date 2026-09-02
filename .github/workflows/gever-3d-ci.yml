@@ -1,0 +1,54 @@
+name: GEVER 3D Dashboard CI
+
+on:
+  push:
+    branches:
+      - design/gever-3d-dashboard-spec
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and synchronize lockfile
+        run: npm install --no-audit --no-fund
+
+      - name: Node tests
+        run: node --test src/*.test.js src/components/core3d/*.test.js src/gestures/*.test.js
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit synchronized lockfile
+        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+        working-directory: .
+        run: |
+          if git diff --quiet -- frontend/package-lock.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package-lock.json
+          git commit -m "chore: sync GEVER 3D dependency lockfile [skip ci]"
+          git push
