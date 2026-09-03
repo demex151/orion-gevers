@@ -1,3 +1,5 @@
+@import "./styles/gever-dashboard-enhancements.css";
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -50,19 +52,26 @@
   }
 }
 
+html,
+body,
+#root {
+  min-width: 100%;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  text-align: initial;
+  border-inline: 0;
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+  display: block;
   box-sizing: border-box;
 }
 
