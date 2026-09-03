@@ -140,12 +140,17 @@ export default function HomeShell() {
   return <div className="gever-shell-root">
     <div className={homeVisible ? "legacy-app legacy-hidden" : "legacy-app legacy-visible"}><App /></div>
     {homeVisible && <main className="gever-dashboard">
+      <div className="hud-frame-corners" aria-hidden="true"><i/><i/><i/><i/></div>
       <Sidebar activeSection={activeSection} onNavigate={openSection} />
       <GreetingHeader status={status} />
       <SystemMetrics cpu={42} memory={68} network={23} status="Óptimo" />
 
       <section className="gever-core-stage">
         <div className="core-title"><h1>NÚCLEO HOLOGRÁFICO GEVER</h1><p>INTELIGENCIA • VOZ • AUTOMATIZACIÓN</p></div>
+        <div className="core-telemetry core-telemetry-left" aria-hidden="true"><span>AI CORE</span><b>ONLINE</b><small>LAT 12MS</small></div>
+        <div className="core-telemetry core-telemetry-right" aria-hidden="true"><span>VOICE LINK</span><b>STABLE</b><small>SYNC 99.8%</small></div>
+        <div className="core-index core-index-a" aria-hidden="true">01</div>
+        <div className="core-index core-index-b" aria-hidden="true">GEV-7</div>
         <GeverCore3D coreState={coreState} />
         <div className="core-caption"><span>{status}</span><span className="core-caption-wave"><i/><i/><i/><i/></span></div>
       </section>
